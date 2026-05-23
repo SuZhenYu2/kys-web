@@ -1,0 +1,25 @@
+{
+  "name": "wuxia-rpg",
+  "version": "1.0.0",
+  "description": "武侠 RPG 游戏 - 基于 Phaser.js",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "keywords": [
+    "phaser",
+    "rpg",
+    "wuxia",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT"
+}
