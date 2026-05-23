@@ -5,6 +5,8 @@ import MainMenuScene from './scenes/MainMenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import BattleScene from './scenes/BattleScene.js';
 import UIScene from './scenes/UIScene.js';
+import InventoryScene from './scenes/InventoryScene.js';
+import SkillScene from './scenes/SkillScene.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -17,7 +19,7 @@ const config = {
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
     pixelArt: false,
-    scene: [BootScene, PreloadScene, MainMenuScene, GameScene, BattleScene, UIScene],
+    scene: [BootScene, PreloadScene, MainMenuScene, GameScene, BattleScene, UIScene, InventoryScene, SkillScene],
     physics: {
         default: 'arcade',
         arcade: {
