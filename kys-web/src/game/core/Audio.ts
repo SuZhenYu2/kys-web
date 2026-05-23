@@ -36,10 +36,15 @@ export class Audio {
 
   async loadSound(name: string, url: string): Promise<void> {
     if (!this.audioCtx_) return;
-    const response = await fetch(this.assetBasePath_ + url);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await this.audioCtx_.decodeAudioData(arrayBuffer);
-    this.audioBuffers_.set(name, audioBuffer);
+    try {
+      const response = await fetch(this.assetBasePath_ + url);
+      if (!response.ok) return;
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioCtx_.decodeAudioData(arrayBuffer);
+      this.audioBuffers_.set(name, audioBuffer);
+    } catch {
+      // 音频文件不存在或解码失败时静默忽略
+    }
   }
 
   setBGMVolume(volume: number): void {
