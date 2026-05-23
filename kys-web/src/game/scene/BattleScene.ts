@@ -122,18 +122,15 @@ export class BattleScene extends Scene {
   }
 
   private async loadTextures(): Promise<void> {
-    try {
-      for (let i = 0; i <= 255; i++) {
-        const tex = await Engine.getInstance().loadImage(`textures/person/person_${i}.png`);
-        this.personTextures_.set(i, tex);
-      }
-    } catch {}
-    try {
-      for (let i = 1; i <= 100; i++) {
-        const tex = await Engine.getInstance().loadImage(`textures/effect/effect_${i}.png`);
-        this.effectTextures_.set(i, tex);
-      }
-    } catch {}
+    const { getGeneratedTexture } = await import('../core/TextureGenerator');
+    for (let i = 0; i <= 255; i++) {
+      const tex = getGeneratedTexture(`person_${i}`);
+      if (tex) this.personTextures_.set(i, tex);
+    }
+    for (let i = 1; i <= 100; i++) {
+      const tex = getGeneratedTexture(`effect_${i}`);
+      if (tex) this.effectTextures_.set(i, tex);
+    }
   }
 
   backRun(): void {

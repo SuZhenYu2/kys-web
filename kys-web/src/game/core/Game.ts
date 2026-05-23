@@ -9,6 +9,7 @@ import { RunNode } from '../scene/RunNode';
 import { useGameStore } from '../data/GameState';
 import { SaveManager } from '../data/SaveManager';
 import { defaultGameSettings, BattleMode, createRole, SubMapInfo } from '../data/Types';
+import { generateAllPlaceholderTextures } from './TextureGenerator';
 
 export class Game {
   private engine_: Engine;
@@ -41,6 +42,12 @@ export class Game {
   async start(): Promise<void> {
     if (!this.initialized_) return;
     const store = useGameStore.getState();
+    store.setLoading(true);
+    store.setLoadProgress(0);
+    store.setCurrentScene('loading');
+
+    await generateAllPlaceholderTextures();
+
     store.setLoading(false);
     store.setLoadProgress(1);
     store.setCurrentScene('title');

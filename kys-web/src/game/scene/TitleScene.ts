@@ -27,6 +27,10 @@ export class TitleScene extends RunNode {
     try {
       this.bgImage_ = await engine.loadImage('textures/title_bg.png');
     } catch {}
+    if (!this.bgImage_) {
+      const { getGeneratedTexture } = await import('../core/TextureGenerator');
+      this.bgImage_ = getGeneratedTexture('title_bg') || null;
+    }
     try {
       this.logoImage_ = await engine.loadImage('textures/logo.png');
     } catch {}

@@ -358,11 +358,47 @@ export class Engine {
     const cached = this.textureMap_.get(fullPath);
     if (cached) return cached;
 
-    const response = await fetch(fullPath);
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
-    this.textureMap_.set(fullPath, bitmap);
-    return bitmap;
+    try {
+      const response = await fetch(fullPath);
+      if (response.ok) {
+        const blob = await response.blob();
+        const bitmap = await createImageBitmap(blob);
+        this.textureMap_.set(fullPath, bitmap);
+        return bitmap;
+      }
+    } catch {}
+
+    const { getGeneratedTexture } = await import('./TextureGenerator');
+    const parts = path.split('/');
+    const fileName = parts[parts.length - 1];
+    const nameWithoutExt = fileName.replace(/\.(png|jpg|webp)$/, '');
+    const generated = getGeneratedTexture(nameWithoutExt);
+    if (generated) {
+      this.textureMap_.set(fullPath, generated);
+      return generated;
+    }
+
+    const fallback = this.createFallbackTexture(path);
+    this.textureMap_.set(fullPath, fallback);
+    return fallback;
+  }
+
+  private createFallbackTexture(path: string): ImageBitmap {
+    const c = document.createElement('canvas');
+    c.width = 36;
+    c.height = 36;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 0, 36, 36);
+    ctx.fillStyle = '#666';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const label = path.split('/').pop()?.substring(0, 6) || '?';
+    ctx.fillText(label, 18, 18);
+
+    const bitmap = createImageBitmap(c);
+    return bitmap as unknown as ImageBitmap;
   }
 
   async loadImageElement(path: string): Promise<HTMLImageElement> {

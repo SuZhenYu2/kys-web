@@ -66,24 +66,19 @@ export class SubScene extends Scene {
   }
 
   private async loadTextures(): Promise<void> {
-    try {
-      for (let i = 1; i <= 500; i++) {
-        const tex = await Engine.getInstance().loadImage(`textures/earth/earth_${i}.png`);
-        this.earthTextures_.set(i, tex);
-      }
-    } catch {}
-    try {
-      for (let i = 1; i <= 500; i++) {
-        const tex = await Engine.getInstance().loadImage(`textures/building/building_${i}.png`);
-        this.buildTextures_.set(i, tex);
-      }
-    } catch {}
-    try {
-      for (let i = 0; i <= 255; i++) {
-        const tex = await Engine.getInstance().loadImage(`textures/person/person_${i}.png`);
-        this.personTextures_.set(i, tex);
-      }
-    } catch {}
+    const { getGeneratedTexture } = await import('../core/TextureGenerator');
+    for (let i = 1; i <= 500; i++) {
+      const tex = getGeneratedTexture(`earth_${i}`);
+      if (tex) this.earthTextures_.set(i, tex);
+    }
+    for (let i = 1; i <= 500; i++) {
+      const tex = getGeneratedTexture(`building_${i}`);
+      if (tex) this.buildTextures_.set(i, tex);
+    }
+    for (let i = 0; i <= 255; i++) {
+      const tex = getGeneratedTexture(`person_${i}`);
+      if (tex) this.personTextures_.set(i, tex);
+    }
   }
 
   setSubMap(map: SubMapInfo): void {
