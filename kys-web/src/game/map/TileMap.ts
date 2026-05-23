@@ -1,6 +1,6 @@
 import { Engine } from '../core/Engine';
-import { SubMapInfoData } from '../data/Types';
-import { SUBMAP_COORD_COUNT } from '../data/Types';
+import { SubMapInfo } from '../data/Types';
+import { COORD_COUNT } from '../data/Types';
 import { Rect } from '../utils/math';
 
 export class TileCamera {
@@ -59,7 +59,7 @@ export class TileMap {
     return { mx, my };
   }
 
-  render(subMap: SubMapInfoData): void {
+  render(subMap: SubMapInfo): void {
     const engine = Engine.getInstance();
     const ctx = engine.offCtx;
     if (!ctx) return;
@@ -75,10 +75,8 @@ export class TileMap {
 
     const startX = Math.max(0, Math.floor(camX - tilesWide / 2));
     const startY = Math.max(0, Math.floor(camY - tilesHigh / 2));
-    const endX = Math.min(SUBMAP_COORD_COUNT, Math.ceil(camX + tilesWide / 2));
-    const endY = Math.min(SUBMAP_COORD_COUNT, Math.ceil(camY + tilesHigh / 2));
-
-    this.renderLayer(ctx, subMap.Earth, subMap.Earth, startX, startY, endX, endY, camX, camY, -1);
+    const endX = Math.min(COORD_COUNT, Math.ceil(camX + tilesWide / 2));
+    const endY = Math.min(COORD_COUNT, Math.ceil(camY + tilesHigh / 2));
 
     this.renderLayer(ctx, subMap.Building, subMap.Earth, startX, startY, endX, endY, camX, camY, 0);
 
@@ -93,7 +91,7 @@ export class TileMap {
     camX: number, camY: number,
     pass: number
   ): void {
-    const count = SUBMAP_COORD_COUNT;
+    const count = COORD_COUNT;
 
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
@@ -110,7 +108,8 @@ export class TileMap {
     }
   }
 
-  renderPlaceholder(subMap: SubMapInfoData): void {
+  renderPlaceholder(subMap: SubMapInfo): void {
+    if (!subMap) return;
     const engine = Engine.getInstance();
     const ctx = engine.offCtx;
     if (!ctx) return;
@@ -128,8 +127,8 @@ export class TileMap {
 
     const startX = Math.max(0, Math.floor(camX - tilesWide / 2));
     const startY = Math.max(0, Math.floor(camY - tilesHigh / 2));
-    const endX = Math.min(SUBMAP_COORD_COUNT, Math.ceil(camX + tilesWide / 2));
-    const endY = Math.min(SUBMAP_COORD_COUNT, Math.ceil(camY + tilesHigh / 2));
+    const endX = Math.min(COORD_COUNT, Math.ceil(camX + tilesWide / 2));
+    const endY = Math.min(COORD_COUNT, Math.ceil(camY + tilesHigh / 2));
 
     const colors = ['#3a2a1a', '#4a3520', '#3d2d18', '#453020'];
 

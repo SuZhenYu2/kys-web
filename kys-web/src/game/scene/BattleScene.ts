@@ -1,42 +1,184 @@
 import { Scene } from './Scene';
 import { RunNode } from './RunNode';
 import { Engine } from '../core/Engine';
-import { BattleMode } from '../data/Types';
+import {
+  BattleMode, Towards, Role, Point,
+  BATTLEMAP_COORD_COUNT, BATTLE_ENEMY_COUNT,
+  MAN_PIC_0, MAN_PIC_COUNT, ANIMATION_DELAY
+} from '../data/Types';
+import { Menu } from '../ui/Menu';
+import { TextBox } from '../ui/TextBox';
+
+enum BattleState {
+  Begin,
+  SelectAction,
+  SelectTarget,
+  SelectMagic,
+  SelectItem,
+  Action,
+  Animation,
+  Exp,
+  End,
+}
 
 export class BattleScene extends Scene {
   private mode_: BattleMode = BattleMode.TurnBased;
+  private battleState_: BattleState = BattleState.Begin;
   private turnCount_: number = 0;
+  private turnOrder_: number[] = [];
+  private currentActor_: number = 0;
   private selectedAction_: number = 0;
-  private actionMenuItems_: string[] = ['攻击', '武学', '物品', '防御', '逃跑'];
-  private isPlayerTurn_: boolean = true;
-  private messageText_: string = '';
+  private selectedMagic_: number = -1;
+  private selectedItem_: number = -1;
+  private selectedTarget_: number = -1;
+
+  private actionMenu_: Menu | null = null;
+  private magicMenu_: Menu | null = null;
+  private itemMenu_: Menu | null = null;
+  private targetMenu_: Menu | null = null;
+  private textBox_: TextBox | null = null;
+  private resultText_: TextBox | null = null;
+
+  private teamRoles_: Role[] = [];
+  private enemies_: Role[] = [];
+  private turnOrderRoles_: Role[] = [];
+
+  private cursorX_: number = 0;
+  private cursorY_: number = 0;
+  private actionAnimationFrame_: number = 0;
+  private actionAnimationCount_: number = 0;
+  private moveAnimation_: boolean = false;
+  private moveFrom_: Point = { x: 0, y: 0 };
+  private moveTo_: Point = { x: 0, y: 0 };
+  private moveProgress_: number = 0;
+
+  private showNumberAnimations_: { x: number; y: number; text: string; color: string; timer: number; }[] = [];
+  private deadAlpha_: Map<Role, number> = new Map();
+
+  private battleResult_: number = 0;
+  private showExp_: boolean = false;
+  private showExpTimer_: number = 0;
+  private totalExpGot_: number = 0;
+
+  private personTextures_: Map<number, ImageBitmap> = new Map();
+  private effectTextures_: Map<number, ImageBitmap> = new Map();
 
   constructor() {
     super();
     this.fullWindow_ = 1;
+    this.coordCount = BATTLEMAP_COORD_COUNT;
   }
 
   setMode(mode: BattleMode): void {
     this.mode_ = mode;
   }
 
+  setTeamRoles(roles: Role[]): void {
+    this.teamRoles_ = roles;
+  }
+
+  setEnemies(roles: Role[]): void {
+    this.enemies_ = roles;
+  }
+
   async onEntrance(): Promise<void> {
+    this.calViewRegion();
     this.turnCount_ = 0;
-    this.isPlayerTurn_ = true;
-    this.selectedAction_ = 0;
-    this.messageText_ = '战斗开始！';
+    this.battleState_ = BattleState.Begin;
+    this.showNumberAnimations_ = [];
+    this.deadAlpha_.clear();
+    this.totalExpGot_ = 0;
+
+    this.actionMenu_ = new Menu(Engine.getInstance().uiWidth - 260, 60, 240);
+    this.actionMenu_.setItems([
+      { text: '攻击', enabled: true, tag: 0 },
+      { text: '武学', enabled: true, tag: 1 },
+      { text: '物品', enabled: true, tag: 2 },
+      { text: '防御', enabled: true, tag: 3 },
+      { text: '逃跑', enabled: true, tag: 4 },
+    ]);
+    this.actionMenu_.setStayFrame(-1);
+    this.addChild(this.actionMenu_);
+
+    this.textBox_ = new TextBox(60, Engine.getInstance().uiHeight - 160, Engine.getInstance().uiWidth - 120, 120);
+    this.textBox_.setText('战斗开始！');
+    this.addChild(this.textBox_);
+
+    await this.loadTextures();
+  }
+
+  onExit(): void {
+    this.clearChildren();
+    this.actionMenu_ = null;
+    this.magicMenu_ = null;
+    this.itemMenu_ = null;
+    this.targetMenu_ = null;
+    this.textBox_ = null;
+    this.resultText_ = null;
+    this.personTextures_.clear();
+    this.effectTextures_.clear();
+    this.showNumberAnimations_ = [];
+    this.deadAlpha_.clear();
+  }
+
+  private async loadTextures(): Promise<void> {
+    try {
+      for (let i = 0; i <= 255; i++) {
+        const tex = await Engine.getInstance().loadImage(`textures/person/person_${i}.png`);
+        this.personTextures_.set(i, tex);
+      }
+    } catch {}
+    try {
+      for (let i = 1; i <= 100; i++) {
+        const tex = await Engine.getInstance().loadImage(`textures/effect/effect_${i}.png`);
+        this.effectTextures_.set(i, tex);
+      }
+    } catch {}
   }
 
   backRun(): void {
-    if (!this.isPlayerTurn_) {
-      this.handleAI();
+    this.updateAnimation();
+    this.updateShowNumbers();
+    this.updateDeadAlpha();
+    this.updateMoveAnimation();
+  }
+
+  private updateAnimation(): void {
+    if (this.battleState_ !== BattleState.Animation) return;
+    this.actionAnimationCount_++;
+    if (this.actionAnimationCount_ >= ANIMATION_DELAY) {
+      this.actionAnimationCount_ = 0;
+      this.actionAnimationFrame_++;
     }
   }
 
-  private handleAI(): void {
-    this.isPlayerTurn_ = true;
-    this.turnCount_++;
-    this.messageText_ = `回合 ${this.turnCount_} - 请选择行动`;
+  private updateShowNumbers(): void {
+    for (let i = this.showNumberAnimations_.length - 1; i >= 0; i--) {
+      this.showNumberAnimations_[i].timer--;
+      if (this.showNumberAnimations_[i].timer <= 0) {
+        this.showNumberAnimations_.splice(i, 1);
+      }
+    }
+  }
+
+  private updateDeadAlpha(): void {
+    for (const [role, alpha] of this.deadAlpha_.entries()) {
+      const newAlpha = Math.max(0, alpha - 2);
+      if (newAlpha <= 0) {
+        this.deadAlpha_.delete(role);
+      } else {
+        this.deadAlpha_.set(role, newAlpha);
+      }
+    }
+  }
+
+  private updateMoveAnimation(): void {
+    if (!this.moveAnimation_) return;
+    this.moveProgress_ += 0.05;
+    if (this.moveProgress_ >= 1) {
+      this.moveAnimation_ = false;
+      this.moveProgress_ = 1;
+    }
   }
 
   draw(): void {
@@ -45,10 +187,20 @@ export class BattleScene extends Scene {
     if (!ctx) return;
 
     this.drawBackground(ctx);
-    this.drawEnemy(ctx);
-    this.drawPlayer(ctx);
-    this.drawActionMenu(ctx);
-    this.drawMessage(ctx);
+    this.drawBattleMap(ctx);
+
+    for (const enemy of this.enemies_) {
+      if (enemy.Dead) continue;
+      this.drawRole(ctx, enemy);
+    }
+
+    for (const role of this.teamRoles_) {
+      if (role.Dead) continue;
+      this.drawRole(ctx, role);
+    }
+
+    this.drawActionCursor(ctx);
+    this.drawShowNumbers(ctx);
     this.drawHUD(ctx);
   }
 
@@ -56,167 +208,344 @@ export class BattleScene extends Scene {
     const engine = Engine.getInstance();
     const grad = ctx.createLinearGradient(0, 0, 0, engine.uiHeight);
     grad.addColorStop(0, '#1a2a3a');
-    grad.addColorStop(0.5, '#2a1a0a');
+    grad.addColorStop(0.4, '#0a1a2a');
+    grad.addColorStop(0.6, '#1a1a0a');
     grad.addColorStop(1, '#1a0a00');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, engine.uiWidth, engine.uiHeight);
-  }
 
-  private drawEnemy(ctx: CanvasRenderingContext2D): void {
-    const engine = Engine.getInstance();
-    const cx = engine.uiWidth * 0.5;
-    const cy = engine.uiHeight * 0.2;
-
-    ctx.fillStyle = '#c04040';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 40, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#ff6666';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 22px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('强敌', cx, cy + 8);
-
-    ctx.fillStyle = '#333';
-    ctx.fillRect(cx - 80, cy - 60, 160, 12);
-    ctx.fillStyle = '#c04040';
-    ctx.fillRect(cx - 80, cy - 60, 160, 12);
-
-    ctx.fillStyle = '#aaa';
-    ctx.font = '14px serif';
-    ctx.fillText('HP: 500/500', cx, cy - 70);
-    ctx.textAlign = 'start';
-  }
-
-  private drawPlayer(ctx: CanvasRenderingContext2D): void {
-    const engine = Engine.getInstance();
-    const cx = engine.uiWidth * 0.3;
-    const cy = engine.uiHeight * 0.55;
-
-    ctx.fillStyle = '#4080c0';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 35, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 20px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('主角', cx, cy + 7);
-
-    ctx.fillStyle = '#333';
-    ctx.fillRect(cx - 70, cy - 50, 140, 10);
-    ctx.fillStyle = '#4080c0';
-    ctx.fillRect(cx - 70, cy - 50, 140, 10);
-
-    ctx.fillStyle = '#aaa';
-    ctx.font = '12px serif';
-    ctx.fillText('HP: 200/200  MP: 100/100', cx, cy - 58);
-    ctx.textAlign = 'start';
-  }
-
-  private drawActionMenu(ctx: CanvasRenderingContext2D): void {
-    if (!this.isPlayerTurn_) return;
-
-    const engine = Engine.getInstance();
-    const menuX = engine.uiWidth * 0.55;
-    const menuY = engine.uiHeight * 0.4;
-    const menuW = 200;
-    const itemH = 36;
-
-    ctx.fillStyle = 'rgba(20, 10, 5, 0.85)';
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 1;
-    ctx.fillRect(menuX, menuY, menuW, this.actionMenuItems_.length * itemH + 8);
-    ctx.strokeRect(menuX, menuY, menuW, this.actionMenuItems_.length * itemH + 8);
-
-    for (let i = 0; i < this.actionMenuItems_.length; i++) {
-      const iy = menuY + 4 + i * itemH;
-      const isSelected = i === this.selectedAction_;
-
-      if (isSelected) {
-        ctx.fillStyle = 'rgba(139, 105, 20, 0.4)';
-        ctx.fillRect(menuX + 2, iy, menuW - 4, itemH);
-      }
-
-      ctx.fillStyle = isSelected ? '#D4A040' : '#8B7A5A';
-      ctx.font = `${isSelected ? 20 : 18}px serif`;
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      const prefix = isSelected ? '▸ ' : '    ';
-      ctx.fillText(prefix + this.actionMenuItems_[i], menuX + 16, iy + itemH / 2 + 1);
+    for (let i = 0; i < 20; i++) {
+      const x = (i * 137 + this.turnCount_ * 2) % engine.uiWidth;
+      const y = (i * 89) % Math.floor(engine.uiHeight * 0.6);
+      ctx.fillStyle = 'rgba(200, 200, 180, 0.05)';
+      ctx.beginPath();
+      ctx.arc(x, y, 1 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.textAlign = 'start';
   }
 
-  private drawMessage(ctx: CanvasRenderingContext2D): void {
-    if (!this.messageText_) return;
+  private drawBattleMap(ctx: CanvasRenderingContext2D): void {
     const engine = Engine.getInstance();
-    const my = engine.uiHeight - 60;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(20, my, engine.uiWidth - 40, 44);
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(20, my, engine.uiWidth - 40, 44);
+    const w = engine.uiWidth;
+    const h = engine.uiHeight;
+    const TW = Scene.TILE_W;
+    const TH = Scene.TILE_H;
+    const battleCenterX = w * 0.4;
+    const battleCenterY = h * 0.5;
 
-    ctx.fillStyle = '#D4C090';
-    ctx.font = '18px serif';
+    for (let y = -2; y < h / TH + 2; y++) {
+      for (let x = -2; x < w / (2 * TW) + 2; x++) {
+        const sx = -y * TW + x * TW + battleCenterX;
+        const sy = y * TH + x * TH + battleCenterY;
+
+        const ci = ((x + y) & 3);
+        const colors = ['#1a2030', '#1c2232', '#1a2133', '#1e2435'];
+        ctx.fillStyle = colors[ci];
+        ctx.strokeStyle = '#2a3040';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + TH);
+        ctx.lineTo(sx + TW, sy);
+        ctx.lineTo(sx + 2 * TW, sy + TH);
+        ctx.lineTo(sx + TW, sy + 2 * TH);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }
+
+  private getBattlePosition(mapX: number, mapY: number): { sx: number; sy: number } {
+    const engine = Engine.getInstance();
+    const w = engine.uiWidth;
+    const h = engine.uiHeight;
+    const TW = Scene.TILE_W;
+    const TH = Scene.TILE_H;
+    const battleCenterX = w * 0.4;
+    const battleCenterY = h * 0.5;
+
+    return {
+      sx: -mapY * TW + mapX * TW + battleCenterX,
+      sy: mapY * TH + mapX * TH + battleCenterY,
+    };
+  }
+
+  private drawRole(ctx: CanvasRenderingContext2D, role: Role): void {
+    const pos = this.getBattlePosition(role.X_, role.Y_);
+    const alpha = this.deadAlpha_.get(role);
+    if (alpha !== undefined) {
+      ctx.globalAlpha = alpha / 255;
+    }
+
+    const tex = this.personTextures_.get(role.Pic);
+    if (tex) {
+      ctx.drawImage(tex, pos.sx - 18, pos.sy - 36, 36, 48);
+    } else {
+      const isTeam = role.Team === 0;
+      ctx.fillStyle = isTeam ? '#4488cc' : '#c04040';
+      ctx.beginPath();
+      ctx.arc(pos.sx, pos.sy, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    if (alpha !== undefined) {
+      ctx.globalAlpha = 1;
+    }
+
+    const hpRatio = role.HP / role.MaxHP;
+    const hpBarW = 40;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(pos.sx - hpBarW / 2, pos.sy - 42, hpBarW, 5);
+    ctx.fillStyle = hpRatio > 0.5 ? '#44cc44' : hpRatio > 0.25 ? '#cccc44' : '#cc4444';
+    ctx.fillRect(pos.sx - hpBarW / 2, pos.sy - 42, hpBarW * hpRatio, 5);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '11px serif';
     ctx.textAlign = 'center';
-    ctx.fillText(this.messageText_, engine.uiWidth / 2, my + 26);
-    ctx.textAlign = 'start';
+    ctx.fillText(`${role.HP}/${role.MaxHP}`, pos.sx, pos.sy - 46);
+
+    if (role.Show.ShowStrings.length > 0) {
+      ctx.fillStyle = '#ff0';
+      ctx.font = '12px serif';
+      for (let i = 0; i < role.Show.ShowStrings.length; i++) {
+        ctx.fillText(role.Show.ShowStrings[i].Text, pos.sx, pos.sy - 55 - i * 14);
+      }
+    }
+    ctx.textAlign = 'left';
+  }
+
+  private drawActionCursor(ctx: CanvasRenderingContext2D): void {
+    if (this.battleState_ !== BattleState.SelectTarget && this.battleState_ !== BattleState.SelectAction) return;
+    const pos = this.getBattlePosition(this.cursorX_, this.cursorY_);
+
+    ctx.strokeStyle = '#ff0';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(pos.sx - 20, pos.sy - 40, 40, 50);
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
+    ctx.fillRect(pos.sx - 20, pos.sy - 40, 40, 50);
+  }
+
+  private drawShowNumbers(ctx: CanvasRenderingContext2D): void {
+    for (const anim of this.showNumberAnimations_) {
+      const y = anim.y - (60 - anim.timer) * 0.5;
+      ctx.fillStyle = anim.color;
+      ctx.font = `bold 18px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(anim.text, anim.x, y);
+    }
+    ctx.textAlign = 'left';
   }
 
   private drawHUD(ctx: CanvasRenderingContext2D): void {
     const engine = Engine.getInstance();
-    ctx.fillStyle = '#8B7A5A';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, engine.uiWidth, 50);
+    ctx.fillStyle = '#aaa';
     ctx.font = '14px serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`模式: ${BattleMode[this.mode_]} | 回合: ${this.turnCount_}`, engine.uiWidth - 20, 24);
-    ctx.textAlign = 'start';
+    ctx.fillText(`回合: ${this.turnCount_}  模式: ${BattleMode[this.mode_]}`, engine.uiWidth - 10, 30);
+    ctx.textAlign = 'left';
+
+    if (this.showExp_) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillRect(engine.uiWidth / 2 - 120, engine.uiHeight / 2 - 30, 240, 60);
+      ctx.strokeStyle = '#8B6914';
+      ctx.strokeRect(engine.uiWidth / 2 - 120, engine.uiHeight / 2 - 30, 240, 60);
+      ctx.fillStyle = '#D4A040';
+      ctx.font = 'bold 20px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`获得经验: +${this.totalExpGot_}`, engine.uiWidth / 2, engine.uiHeight / 2);
+      ctx.textAlign = 'left';
+    }
   }
 
   dealEvent(): void {
-    if (!this.isPlayerTurn_) return;
     const engine = Engine.getInstance();
-
-    if (engine.isKeyJustPressed('ArrowUp')) {
-      this.selectedAction_ = (this.selectedAction_ - 1 + this.actionMenuItems_.length) % this.actionMenuItems_.length;
+    if (this.battleState_ === BattleState.SelectAction) {
+      if (this.actionMenu_) {
+        if (engine.isKeyJustPressed('ArrowUp')) {
+          const idx = this.actionMenu_.getSelectedIndex();
+          this.actionMenu_.forceActiveChild((idx - 1 + 5) % 5);
+        }
+        if (engine.isKeyJustPressed('ArrowDown')) {
+          const idx = this.actionMenu_.getSelectedIndex();
+          this.actionMenu_.forceActiveChild((idx + 1) % 5);
+        }
+      }
     }
-    if (engine.isKeyJustPressed('ArrowDown')) {
-      this.selectedAction_ = (this.selectedAction_ + 1) % this.actionMenuItems_.length;
+
+    if (this.battleState_ === BattleState.SelectTarget) {
+      if (engine.isKeyJustPressed('ArrowLeft')) this.cursorX_--;
+      if (engine.isKeyJustPressed('ArrowRight')) this.cursorX_++;
+      if (engine.isKeyJustPressed('ArrowUp')) this.cursorY_--;
+      if (engine.isKeyJustPressed('ArrowDown')) this.cursorY_++;
+      this.cursorX_ = Math.max(0, Math.min(BATTLEMAP_COORD_COUNT - 1, this.cursorX_));
+      this.cursorY_ = Math.max(0, Math.min(BATTLEMAP_COORD_COUNT - 1, this.cursorY_));
     }
   }
 
   onPressedOK(): void {
-    if (!this.isPlayerTurn_) return;
+    switch (this.battleState_) {
+      case BattleState.Begin:
+        this.battleState_ = BattleState.SelectAction;
+        this.turnCount_ = 1;
+        break;
 
-    switch (this.selectedAction_) {
-      case 0:
-        this.messageText_ = '发起攻击！';
+      case BattleState.SelectAction:
+        this.selectedAction_ = this.actionMenu_ ? this.actionMenu_.getSelectedIndex() : 0;
+        if (this.selectedAction_ === 0) {
+          this.battleState_ = BattleState.SelectTarget;
+        } else if (this.selectedAction_ === 1) {
+          this.battleState_ = BattleState.SelectMagic;
+        } else if (this.selectedAction_ === 2) {
+          this.battleState_ = BattleState.SelectItem;
+        } else if (this.selectedAction_ === 3) {
+          this.performDefend();
+        } else if (this.selectedAction_ === 4) {
+          this.performEscape();
+        }
         break;
-      case 1:
-        this.messageText_ = '选择武学...';
+
+      case BattleState.SelectTarget:
+        this.performAttack();
         break;
-      case 2:
-        this.messageText_ = '打开物品栏...';
+
+      case BattleState.Animation:
+        this.battleState_ = BattleState.SelectAction;
         break;
-      case 3:
-        this.messageText_ = '进入防御姿态...';
+
+      case BattleState.Exp:
+        this.battleState_ = BattleState.End;
         break;
-      case 4:
-        this.messageText_ = '尝试逃跑...';
+
+      case BattleState.End:
+        this.exitWithResult(this.battleResult_);
         break;
     }
-
-    this.isPlayerTurn_ = false;
-    setTimeout(() => this.handleAI(), 1000);
   }
 
   onPressedCancel(): void {
-    this.selectedAction_ = 4;
-    this.onPressedOK();
+    if (this.battleState_ === BattleState.SelectTarget ||
+        this.battleState_ === BattleState.SelectMagic ||
+        this.battleState_ === BattleState.SelectItem) {
+      this.battleState_ = BattleState.SelectAction;
+    }
+  }
+
+  private performAttack(): void {
+    const attacker = this.teamRoles_[0];
+    if (!attacker || attacker.Dead) return;
+
+    let targetIdx = -1;
+    for (let i = 0; i < this.enemies_.length; i++) {
+      const e = this.enemies_[i];
+      if (!e.Dead) {
+        targetIdx = i;
+        break;
+      }
+    }
+    if (targetIdx < 0) return;
+
+    const target = this.enemies_[targetIdx];
+    const damage = this.calPhysicalHurt(attacker, target);
+    target.HP = Math.max(0, target.HP - damage);
+    target.Show.BattleHurt = damage;
+
+    const pos = this.getBattlePosition(target.X_, target.Y_);
+    this.showNumberAnimations_.push({
+      x: pos.sx, y: pos.sy - 20,
+      text: `-${damage}`,
+      color: '#ff4444',
+      timer: 60,
+    });
+
+    if (target.HP <= 0) {
+      target.Dead = 1;
+      this.deadAlpha_.set(target, 255);
+    }
+
+    this.battleState_ = BattleState.Animation;
+    this.actionAnimationFrame_ = 0;
+    setTimeout(() => this.onAnimationEnd(), 1500);
+  }
+
+  private performDefend(): void {
+    this.showNumberAnimations_.push({
+      x: 200, y: 400,
+      text: '进入防御姿态',
+      color: '#44aaff',
+      timer: 40,
+    });
+    this.battleState_ = BattleState.Animation;
+    setTimeout(() => this.onAnimationEnd(), 800);
+  }
+
+  private performEscape(): void {
+    if (Math.random() < 0.5) {
+      this.showNumberAnimations_.push({
+        x: 400, y: 300,
+        text: '逃跑成功！',
+        color: '#44ff44',
+        timer: 60,
+      });
+      this.battleResult_ = 1;
+      this.battleState_ = BattleState.End;
+    } else {
+      this.showNumberAnimations_.push({
+        x: 400, y: 300,
+        text: '逃跑失败！',
+        color: '#ff4444',
+        timer: 40,
+      });
+      this.battleState_ = BattleState.Animation;
+      setTimeout(() => this.onAnimationEnd(), 800);
+    }
+  }
+
+  private calPhysicalHurt(attacker: Role, defender: Role): number {
+    const baseHurt = attacker.Attack - defender.Defence / 2;
+    const randomFactor = 0.9 + Math.random() * 0.2;
+    return Math.max(1, Math.floor(baseHurt * randomFactor));
+  }
+
+  private calMagicHurt(magic: { Attack: number[] }, attacker: Role, defender: Role): number {
+    const level = 1;
+    const attack = magic.Attack[Math.min(level, magic.Attack.length - 1)];
+    const baseHurt = attack - defender.Defence / 3;
+    const randomFactor = 0.85 + Math.random() * 0.3;
+    return Math.max(1, Math.floor(baseHurt * randomFactor));
+  }
+
+  private onAnimationEnd(): void {
+    let allDead = true;
+    for (const e of this.enemies_) {
+      if (!e.Dead) { allDead = false; break; }
+    }
+
+    if (allDead) {
+      this.battleResult_ = 1;
+      this.totalExpGot_ = this.calTotalExp();
+      this.showExp_ = true;
+      this.showExpTimer_ = 120;
+      this.battleState_ = BattleState.Exp;
+    } else {
+      this.battleState_ = BattleState.SelectAction;
+    }
+  }
+
+  private calTotalExp(): number {
+    let exp = 0;
+    for (const e of this.enemies_) {
+      if (e.Dead) {
+        exp += e.Level * 10;
+      }
+    }
+    return exp;
   }
 }

@@ -1,24 +1,34 @@
-import { RunNode, NodeState, Direction } from './RunNode';
+import { RunNode } from './RunNode';
 import { Engine } from '../core/Engine';
 import { Audio } from '../core/Audio';
 
 export class MainMenuScene extends RunNode {
-  private menuItems_: string[] = ['新的故事', '读取存档', '系统设置', '离开江湖'];
+  private menuItems_: string[] = ['新的故事', '继续游戏', '读取存档', '系统设置', '离开江湖'];
   private selectedIndex_: number = 0;
   private bgImage_: ImageBitmap | HTMLImageElement | null = null;
+  private itemYOffsets_: number[] = [];
+  private canExit_: boolean = false;
 
   constructor() {
     super();
     this.fullWindow_ = 1;
+    this.recalcItemPositions();
+  }
+
+  private recalcItemPositions(): void {
+    this.itemYOffsets_ = [];
+    for (let i = 0; i < this.menuItems_.length; i++) {
+      this.itemYOffsets_.push(0);
+    }
   }
 
   async onEntrance(): Promise<void> {
     const engine = Engine.getInstance();
     try {
       this.bgImage_ = await engine.loadImage('textures/menu_bg.png');
-    } catch {
-      this.bgImage_ = null;
-    }
+    } catch {}
+    this.selectedIndex_ = 0;
+    this.canExit_ = false;
   }
 
   draw(): void {
@@ -28,76 +38,80 @@ export class MainMenuScene extends RunNode {
     const ctx = engine.offCtx;
     if (!ctx) return;
 
-    ctx.fillStyle = '#0d0500';
+    ctx.fillStyle = '#0a0300';
     ctx.fillRect(0, 0, w, h);
 
     if (this.bgImage_) {
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.25;
       ctx.drawImage(this.bgImage_, 0, 0, w, h);
       ctx.globalAlpha = 1;
     }
 
-    const panelW = 360;
-    const panelH = 380;
+    const panelW = 380;
+    const panelH = this.menuItems_.length * 52 + 100;
     const panelX = (w - panelW) / 2;
-    const panelY = (h - panelH) / 2 - 30;
+    const panelY = (h - panelH) / 2 - 10;
 
-    ctx.fillStyle = 'rgba(30, 15, 5, 0.85)';
+    ctx.fillStyle = 'rgba(25, 12, 4, 0.88)';
     ctx.strokeStyle = '#8B6914';
     ctx.lineWidth = 2;
     this.roundRect(ctx, panelX, panelY, panelW, panelH, 12);
     ctx.fill();
     ctx.stroke();
 
-    ctx.strokeStyle = '#6B4914';
+    ctx.strokeStyle = 'rgba(100, 70, 20, 0.4)';
     ctx.lineWidth = 1;
     this.roundRect(ctx, panelX + 6, panelY + 6, panelW - 12, panelH - 12, 8);
     ctx.stroke();
 
     ctx.fillStyle = '#C8A050';
-    ctx.font = 'bold 36px serif';
+    ctx.font = 'bold 32px serif';
     ctx.textAlign = 'center';
-    ctx.fillText('江湖之路', panelX + panelW / 2, panelY + 60);
+    ctx.fillText('江 湖 之 旅', panelX + panelW / 2, panelY + 52);
+    ctx.textAlign = 'start';
 
     ctx.strokeStyle = '#6B4914';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(panelX + 40, panelY + 80);
-    ctx.lineTo(panelX + panelW - 40, panelY + 80);
+    ctx.moveTo(panelX + 30, panelY + 72);
+    ctx.lineTo(panelX + panelW - 30, panelY + 72);
     ctx.stroke();
 
-    const itemStartY = panelY + 110;
-    const itemHeight = 50;
+    const itemStartY = panelY + 90;
+    const itemH = 48;
     const itemSpacing = 4;
 
     for (let i = 0; i < this.menuItems_.length; i++) {
-      const iy = itemStartY + i * (itemHeight + itemSpacing);
+      const iy = itemStartY + i * (itemH + itemSpacing) + this.itemYOffsets_[i];
       const isSelected = i === this.selectedIndex_;
 
       if (isSelected) {
-        ctx.fillStyle = 'rgba(139, 105, 20, 0.3)';
-        ctx.fillRect(panelX + 30, iy - 2, panelW - 60, itemHeight + 4);
+        ctx.fillStyle = 'rgba(139, 105, 20, 0.35)';
+        this.roundRect(ctx, panelX + 24, iy - 4, panelW - 48, itemH + 2, 6);
+        ctx.fill();
 
-        ctx.fillStyle = '#D4A040';
-        ctx.font = 'bold 24px serif';
-        ctx.fillText('▶ ' + this.menuItems_[i], panelX + panelW / 2, iy + itemHeight / 2 + 2);
-
-        const pulse = Math.sin(Date.now() * 0.005) * 3 + 7;
-        ctx.shadowColor = 'rgba(200, 150, 50, 0.6)';
-        ctx.shadowBlur = pulse;
-        ctx.fillText('▶ ' + this.menuItems_[i], panelX + panelW / 2, iy + itemHeight / 2 + 2);
+        const glowPulse = Math.sin(Date.now() * 0.005) * 4 + 8;
+        ctx.shadowColor = 'rgba(220, 160, 50, 0.7)';
+        ctx.shadowBlur = glowPulse;
+        ctx.fillStyle = '#D4A030';
+        ctx.font = 'bold 22px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('▶  ' + this.menuItems_[i], panelX + panelW / 2, iy + itemH / 2 + 3);
         ctx.shadowBlur = 0;
+        ctx.textAlign = 'start';
       } else {
-        ctx.fillStyle = '#8B7A5A';
-        ctx.font = '22px serif';
-        ctx.fillText('    ' + this.menuItems_[i], panelX + panelW / 2, iy + itemHeight / 2 + 2);
+        ctx.fillStyle = '#7A6A4A';
+        ctx.font = '20px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('    ' + this.menuItems_[i], panelX + panelW / 2, iy + itemH / 2 + 2);
+        ctx.textAlign = 'start';
       }
     }
 
-    ctx.fillStyle = '#6B5A3A';
-    ctx.font = '14px serif';
+    ctx.fillStyle = 'rgba(80, 60, 30, 0.5)';
+    ctx.font = '12px serif';
     ctx.textAlign = 'center';
-    ctx.fillText('基于 kys-cpp 移植 | BSD 3-Clause', w / 2, h - 30);
+    ctx.fillText('↑↓ 选择  Enter 确定  Esc 取消', w / 2, panelY + panelH + 24);
     ctx.textAlign = 'start';
   }
 
@@ -130,14 +144,13 @@ export class MainMenuScene extends RunNode {
   }
 
   onPressedOK(): void {
+    Audio.getInstance().playSE('cursor.mp3');
     this.exitWithResult(this.selectedIndex_);
   }
 
   onPressedCancel(): void {
-    if (this.selectedIndex_ === this.menuItems_.length - 1) {
-      this.exitWithResult(-1);
-    } else {
-      this.selectedIndex_ = this.menuItems_.length - 1;
-    }
+    this.selectedIndex_ = this.menuItems_.length - 1;
+    Audio.getInstance().playSE('cancel.mp3');
+    this.exitWithResult(-1);
   }
 }

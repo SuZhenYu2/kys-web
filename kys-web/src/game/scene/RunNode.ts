@@ -22,6 +22,8 @@ export enum Direction {
   Down = 4,
 }
 
+export { Direction as Dir };
+
 export class RunNode {
   static root: RunNode[] = [];
   static refreshInterval: number = 16.67;
