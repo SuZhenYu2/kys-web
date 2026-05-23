@@ -48,6 +48,12 @@ export function GameCanvas() {
         className="block w-full h-full cursor-default"
         tabIndex={0}
       />
+      <a
+        href="/resources"
+        className="absolute top-2 right-2 px-3 py-1 bg-[#1a0a00]/80 border border-[#8B6914]/50 text-[#8B7A5A] text-xs rounded hover:text-[#C8A050] hover:border-[#C8A050] transition-colors z-10 font-serif"
+      >
+        资源管理
+      </a>
     </div>
   );
 }

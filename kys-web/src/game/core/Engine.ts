@@ -368,6 +368,30 @@ export class Engine {
       }
     } catch {}
 
+    try {
+      const { loadTextureFromDB } = await import('../data/ResourceConverter');
+      const parts = path.split('/');
+      const fileName = parts[parts.length - 1];
+      const nameWithoutExt = fileName.replace(/\.(png|jpg|webp)$/, '');
+      const dirParts = parts.slice(0, -1);
+      let typeId = '';
+      if (dirParts.includes('earth') || dirParts.includes('smap-earth')) typeId = 'smap-earth';
+      else if (dirParts.includes('building') || dirParts.includes('smap-build')) typeId = 'smap-build';
+      else if (dirParts.includes('person') || dirParts.includes('fight')) typeId = 'fight';
+      else if (dirParts.includes('head')) typeId = 'head';
+      else if (dirParts.includes('effect') || dirParts.includes('eft')) typeId = 'eft';
+      else if (dirParts.includes('cloud')) typeId = 'cloud';
+      else if (dirParts.includes('mmap-earth')) typeId = 'mmap-earth';
+
+      if (typeId) {
+        const dbTex = await loadTextureFromDB(typeId as any, nameWithoutExt);
+        if (dbTex) {
+          this.textureMap_.set(fullPath, dbTex);
+          return dbTex;
+        }
+      }
+    } catch {}
+
     const { getGeneratedTexture } = await import('./TextureGenerator');
     const parts = path.split('/');
     const fileName = parts[parts.length - 1];
