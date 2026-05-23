@@ -29,11 +29,13 @@ export class GameLoop {
   private loop = (): void => {
     if (!this.running_) return;
 
+    for (let i = RunNode.root.length - 1; i >= 0; i--) {
+      RunNode.root[i].frameUpdate();
+    }
+
     this.engine_.setRenderTargetToMain();
     this.engine_.renderClear();
-
     RunNode.drawAll();
-
     this.engine_.renderPresent();
     this.engine_.flushInput();
 

@@ -37,6 +37,9 @@ export class SubScene extends Scene {
   private menuOpen_: boolean = false;
   private entering_: boolean = true;
 
+  private waterFrame_: number = 0;
+  private waterTimer_: number = 0;
+
   constructor() {
     super();
     this.fullWindow_ = 1;
@@ -147,11 +150,29 @@ export class SubScene extends Scene {
     this.walk_ = false;
   }
 
+  private dialogText_: string = '';
+  private dialogTimer_: number = 0;
+  private dialogDuration_: number = 120;
+
   private triggerEvent(eventIndex: number): void {
     if (!this.subMap_) return;
     const evt = this.subMap_.Events[eventIndex];
     if (evt && evt.Event1 > 0) {
-      // TODO: trigger script by event ID
+      const dialogMap: Record<number, string> = {
+        1: '掌柜：客官里边请，本店有上好客房！',
+        2: '铁匠：需要打造兵器吗？我的手艺可是一流的！',
+        3: '药铺老板：这位大侠，买些金创药防身吧。',
+        10: '路人：听说最近黑木崖那边不太平……',
+        11: '小贩：新鲜的包子！刚出笼的包子！',
+        12: '老者：年轻人，江湖险恶，多加小心啊。',
+        20: '神秘人：……你来黑木崖做什么？',
+        21: '樵夫：这条路上有猛兽出没，要小心！',
+        30: '石壁上刻着：活死人墓，外人止步。',
+        31: '寒潭水面泛着幽幽蓝光……',
+        32: '古墓入口处有一道石门，似乎可以推开。',
+      };
+      this.dialogText_ = dialogMap[evt.Event1] || '……';
+      this.dialogTimer_ = this.dialogDuration_;
     }
   }
 
@@ -170,6 +191,16 @@ export class SubScene extends Scene {
       }
     }
     this.updateManPic();
+
+    if (this.dialogTimer_ > 0) {
+      this.dialogTimer_--;
+    }
+
+    this.waterTimer_++;
+    if (this.waterTimer_ >= 15) {
+      this.waterTimer_ = 0;
+      this.waterFrame_ = (this.waterFrame_ + 1) % 4;
+    }
 
     if (this.fadeDirection_ !== 0) {
       this.fade_ += this.fadeDirection_ * 3;
@@ -213,6 +244,7 @@ export class SubScene extends Scene {
     this.drawMan();
     this.drawDecoration();
     this.drawEvent();
+    this.drawDialog();
     this.drawHUD();
 
     if (this.fade_ > 0) {
@@ -277,8 +309,12 @@ export class SubScene extends Scene {
         if (this.isOutLine(mapX, mapY)) continue;
 
         const idx = mapX + mapY * COORD_COUNT;
-        const tileId = this.subMap_.Earth[idx];
+        let tileId = this.subMap_.Earth[idx];
         if (tileId <= 0) continue;
+
+        if (tileId >= 4 && tileId <= 7) {
+          tileId = 4 + this.waterFrame_;
+        }
 
         const dx = mapX - this.manX;
         const dy = mapY - this.manY;
@@ -443,11 +479,72 @@ export class SubScene extends Scene {
       const sx = -dy * TW + dx * TW + engine.uiWidth / 2;
       const sy = dy * TH + dx * TH + engine.uiHeight / 2;
 
-      ctx.fillStyle = 'rgba(255, 100, 50, 0.6)';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-      ctx.fill();
+      const tex = this.personTextures_.get(evt.CurrentPic);
+      if (tex) {
+        ctx.drawImage(tex, sx - TW * 2, sy - TH * 3, TW * 4, TH * 4);
+      } else {
+        ctx.fillStyle = 'rgba(255, 200, 50, 0.7)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#C8A050';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
+  }
+
+  private drawDialog(): void {
+    if (this.dialogTimer_ <= 0 || !this.dialogText_) return;
+    const engine = Engine.getInstance();
+    const ctx = engine.offCtx;
+    if (!ctx) return;
+
+    const w = engine.uiWidth;
+    const h = engine.uiHeight;
+    const boxW = w - 120;
+    const boxH = 80;
+    const boxX = 60;
+    const boxY = h - boxH - 30;
+
+    const alpha = Math.min(1, this.dialogTimer_ / 20);
+    ctx.globalAlpha = alpha;
+
+    ctx.fillStyle = 'rgba(15, 8, 2, 0.92)';
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 8, boxY);
+    ctx.lineTo(boxX + boxW - 8, boxY);
+    ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + 8, 8);
+    ctx.lineTo(boxX + boxW, boxY + boxH - 8);
+    ctx.arcTo(boxX + boxW, boxY + boxH, boxX + boxW - 8, boxY + boxH, 8);
+    ctx.lineTo(boxX + 8, boxY + boxH);
+    ctx.arcTo(boxX, boxY + boxH, boxX, boxY + boxH - 8, 8);
+    ctx.lineTo(boxX, boxY + 8);
+    ctx.arcTo(boxX, boxY, boxX + 8, boxY, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(100, 70, 20, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 6, boxY + 6);
+    ctx.lineTo(boxX + boxW - 6, boxY + 6);
+    ctx.lineTo(boxX + boxW - 6, boxY + boxH - 6);
+    ctx.lineTo(boxX + 6, boxY + boxH - 6);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.fillStyle = '#D4A050';
+    ctx.font = '18px serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.dialogText_, boxX + 20, boxY + boxH / 2);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = 1;
   }
 
   private drawHUD(): void {
@@ -456,25 +553,52 @@ export class SubScene extends Scene {
     if (!ctx) return;
 
     const w = engine.uiWidth;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(w - 230, 10, 220, 120);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(w - 240, 8, 232, 140);
     ctx.strokeStyle = '#8B6914';
     ctx.lineWidth = 1;
-    ctx.strokeRect(w - 230, 10, 220, 120);
+    ctx.strokeRect(w - 240, 8, 232, 140);
 
     ctx.fillStyle = '#C8A050';
     ctx.font = 'bold 18px serif';
     ctx.textAlign = 'left';
-    ctx.fillText('金庸群侠传', w - 220, 36);
-    ctx.textAlign = 'start';
+    ctx.fillText('金庸群侠传', w - 228, 32);
 
     ctx.fillStyle = '#aaa';
-    ctx.font = '14px serif';
+    ctx.font = '13px serif';
+    ctx.fillText(`坐标: (${this.manX}, ${this.manY})`, w - 228, 52);
+    ctx.fillText(`朝向: ${Towards[this.towards]}`, w - 228, 68);
+
+    const barX = w - 228;
+    const barW = 200;
+    const barH = 12;
+
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, 78, barW, barH);
+    ctx.fillStyle = '#cc3333';
+    ctx.fillRect(barX, 78, barW * 0.85, barH);
+    ctx.strokeStyle = '#661111';
+    ctx.strokeRect(barX, 78, barW, barH);
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HP 85/100', barX + barW / 2, 88);
+
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, 94, barW, barH);
+    ctx.fillStyle = '#3366cc';
+    ctx.fillRect(barX, 94, barW * 0.7, barH);
+    ctx.strokeStyle = '#112266';
+    ctx.strokeRect(barX, 94, barW, barH);
+    ctx.fillStyle = '#fff';
+    ctx.fillText('MP 35/50', barX + barW / 2, 104);
+
     ctx.textAlign = 'left';
-    ctx.fillText(`坐标: (${this.manX}, ${this.manY})`, w - 220, 60);
-    ctx.fillText(`朝向: ${Towards[this.towards]}`, w - 220, 80);
-    ctx.fillText(`步数: ${this.step_}`, w - 220, 100);
-    ctx.fillText('↑←↓→移动 空格菜单 ESC返回', w - 220, 118);
+    ctx.fillStyle = '#888';
+    ctx.font = '11px serif';
+    ctx.fillText('↑←↓→移动  空格菜单  ESC返回', w - 228, 124);
+    ctx.fillText(`地图: ${this.subMap_?.Name || '未知'}`, w - 228, 140);
     ctx.textAlign = 'start';
   }
 
@@ -490,7 +614,11 @@ export class SubScene extends Scene {
     }
 
     if (engine.isKeyJustPressed(' ') || engine.isKeyJustPressed('Enter')) {
-      this.menuOpen_ = !this.menuOpen_;
+      if (this.dialogTimer_ > 0) {
+        this.dialogTimer_ = 0;
+      } else {
+        this.menuOpen_ = !this.menuOpen_;
+      }
     }
 
     if (engine.isKeyJustPressed('Escape')) {

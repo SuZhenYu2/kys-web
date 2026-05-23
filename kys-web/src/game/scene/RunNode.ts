@@ -48,8 +48,10 @@ export class RunNode {
   protected stayFrame_: number = -1;
   protected currentFrame_: number = 0;
   protected dealEvent_: number = 1;
-
   protected prevPresentTicks_: number = 0;
+  protected resolve_: ((value: number) => void) | null = null;
+  protected inRoot_: boolean = false;
+  protected ready_: boolean = false;
 
   get x(): number { return this.x_; }
   get y(): number { return this.y_; }
@@ -239,7 +241,7 @@ export class RunNode {
            engine.isMouseButtonJustPressed(2);
   }
 
-  onEntrance(): void {}
+  onEntrance(): void | Promise<void> {}
   onExit(): void {}
   backRun(): void {}
   draw(): void {}
@@ -255,61 +257,66 @@ export class RunNode {
   }
 
   async run(inRoot: boolean = true): Promise<number> {
+    this.inRoot_ = inRoot;
     if (inRoot) {
       RunNode.root.push(this);
     }
     this.running_ = true;
-    this.onEntrance();
+    await this.onEntrance();
+    this.ready_ = true;
 
     return new Promise<number>((resolve) => {
-      const loop = () => {
-        if (!this.running_) {
-          resolve(this.result_);
-          return;
-        }
-        if (this.exit_) {
-          this.running_ = false;
-          this.onExit();
-          if (inRoot) {
-            RunNode.removeFromDraw(this);
-          }
-          resolve(this.result_);
-          return;
-        }
-
-        this.backRun();
-        this.checkFrame();
-
-        if (this.isPressOK()) {
-          this.onPressedOK();
-        }
-        if (this.isPressCancel()) {
-          this.onPressedCancel();
-        }
-
-        this.dealEvent();
-        for (const child of this.children_) {
-          if (child.visible_ && child.dealEvent_) {
-            child.dealEvent();
-          }
-        }
-
-        this.draw();
-        for (const child of this.children_) {
-          if (child.visible_) {
-            child.draw();
-          }
-        }
-
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
+      this.resolve_ = resolve;
     });
   }
 
   async runAtPosition(x: number, y: number, inRoot: boolean = true): Promise<number> {
     this.setPosition(x, y);
     return this.run(inRoot);
+  }
+
+  frameUpdate(): void {
+    if (!this.ready_ || !this.running_) return;
+
+    if (this.exit_) {
+      this.doExit();
+      return;
+    }
+
+    this.backRun();
+    this.checkFrame();
+
+    if (this.isPressOK()) {
+      this.onPressedOK();
+    }
+    if (this.isPressCancel()) {
+      this.onPressedCancel();
+    }
+
+    this.dealEvent();
+    for (const child of this.children_) {
+      if (child.visible_ && child.dealEvent_) {
+        child.dealEvent();
+      }
+    }
+
+    if (this.exit_) {
+      this.doExit();
+    }
+  }
+
+  private doExit(): void {
+    this.running_ = false;
+    this.ready_ = false;
+    this.onExit();
+    if (this.inRoot_) {
+      RunNode.removeFromDraw(this);
+    }
+    if (this.resolve_) {
+      const resolve = this.resolve_;
+      this.resolve_ = null;
+      resolve(this.result_);
+    }
   }
 
   drawAndPresent(times: number = 1): void {

@@ -10,6 +10,7 @@ import { useGameStore } from '../data/GameState';
 import { SaveManager } from '../data/SaveManager';
 import { defaultGameSettings, BattleMode, createRole, SubMapInfo } from '../data/Types';
 import { generateAllPlaceholderTextures } from './TextureGenerator';
+import { GameData, generateTownMap, generateForestMap, generateCaveMap } from '../data/GameData';
 
 export class Game {
   private engine_: Engine;
@@ -47,6 +48,7 @@ export class Game {
     store.setCurrentScene('loading');
 
     await generateAllPlaceholderTextures();
+    await GameData.loadAll();
 
     store.setLoading(false);
     store.setLoadProgress(1);
@@ -98,7 +100,7 @@ export class Game {
   private async startNewGame(): Promise<void> {
     useGameStore.getState().setCurrentScene('game');
     const role = this.createPlayerRole();
-    const startMap = this.createStartMap();
+    const startMap = generateTownMap();
 
     const subScene = new SubScene();
     subScene.setSubMap(startMap);
@@ -109,7 +111,7 @@ export class Game {
 
   private async continueGame(): Promise<void> {
     useGameStore.getState().setCurrentScene('game');
-    const startMap = this.createStartMap();
+    const startMap = generateTownMap();
     const subScene = new SubScene();
     subScene.setSubMap(startMap);
     await subScene.run(true);
@@ -117,96 +119,30 @@ export class Game {
 
   private createPlayerRole(): ReturnType<typeof createRole> {
     const role = createRole();
-    role.Name = '主角';
-    role.Nick = '江湖侠客';
-    role.HeadID = 1;
-    role.Level = 1;
-    role.Exp = 0;
-    role.HP = 100;
-    role.MaxHP = 100;
-    role.MP = 50;
-    role.MaxMP = 50;
-    role.Attack = 20;
-    role.Defence = 15;
-    role.Speed = 18;
-    role.Medicine = 15;
-    role.Fist = 20;
-    role.Sword = 5;
-    role.MagicID[0] = 1;
-    role.MagicLevel[0] = 1;
-    role.MagicID[1] = 0;
-    role.MagicLevel[1] = 1;
+    const data = GameData.getRole(0);
+    if (data) {
+      Object.assign(role, data);
+    } else {
+      role.Name = '主角';
+      role.Nick = '江湖侠客';
+      role.HeadID = 1;
+      role.Level = 1;
+      role.HP = 100;
+      role.MaxHP = 100;
+      role.MP = 50;
+      role.MaxMP = 50;
+      role.Attack = 20;
+      role.Defence = 15;
+      role.Speed = 18;
+      role.Medicine = 15;
+      role.Fist = 20;
+      role.Sword = 10;
+      role.MagicID[0] = 1;
+      role.MagicLevel[0] = 1;
+      role.MagicID[1] = 2;
+      role.MagicLevel[1] = 1;
+    }
     return role;
-  }
-
-  private createStartMap(): SubMapInfo {
-    const earth = new Int16Array(64 * 64);
-    const building = new Int16Array(64 * 64);
-    const decoration = new Int16Array(64 * 64);
-    const eventIndex = new Int16Array(64 * 64);
-    const buildingHeight = new Int16Array(64 * 64);
-    const decorationHeight = new Int16Array(64 * 64);
-
-    for (let y = 0; y < 64; y++) {
-      for (let x = 0; x < 64; x++) {
-        const idx = x + y * 64;
-        if (y >= 20 && y <= 40 && x >= 20 && x <= 40) {
-          earth[idx] = 2;
-        } else if (y < 15 || y > 50) {
-          earth[idx] = 5;
-        } else if (x < 15 || x > 50) {
-          earth[idx] = 1;
-        } else {
-          earth[idx] = ((x + y) % 3) + 1;
-        }
-        building[idx] = 0;
-        decoration[idx] = 0;
-        eventIndex[idx] = 0;
-        buildingHeight[idx] = 0;
-        decorationHeight[idx] = 0;
-      }
-    }
-
-    for (let x = 22; x <= 38; x++) {
-      building[x + 22 * 64] = 10;
-      buildingHeight[x + 22 * 64] = 18;
-      building[x + 38 * 64] = 10;
-      buildingHeight[x + 38 * 64] = 18;
-    }
-    for (let y = 22; y <= 38; y++) {
-      building[22 + y * 64] = 11;
-      buildingHeight[22 + y * 64] = 18;
-      building[38 + y * 64] = 12;
-      buildingHeight[38 + y * 64] = 18;
-    }
-    building[22 + 22 * 64] = 13;
-    building[38 + 22 * 64] = 14;
-    building[22 + 38 * 64] = 15;
-    building[38 + 38 * 64] = 16;
-
-    return {
-      ID: 1,
-      Name: '襄阳城',
-      ExitMusic: 0,
-      EntranceMusic: 0,
-      JumpSubMap: 0,
-      EntranceCondition: 0,
-      MainEntranceX1: 30, MainEntranceY1: 30,
-      MainEntranceX2: 30, MainEntranceY2: 30,
-      EntranceX: 30,
-      EntranceY: 30,
-      ExitX: [25, 35, 30, 30],
-      ExitY: [30, 30, 25, 35],
-      JumpX: 0, JumpY: 0,
-      JumpReturnX: 0, JumpReturnY: 0,
-      Earth: earth,
-      Building: building,
-      Decoration: decoration,
-      EventIndex: eventIndex,
-      BuildingHeight: buildingHeight,
-      DecorationHeight: decorationHeight,
-      Events: [],
-    };
   }
 
   private async showLoadGame(): Promise<void> {
