@@ -18,6 +18,10 @@ const config = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
+    input: {
+        touch: true,
+        activePointers: 2
+    },
     pixelArt: false,
     scene: [BootScene, PreloadScene, MainMenuScene, GameScene, BattleScene, UIScene, InventoryScene, SkillScene],
     physics: {

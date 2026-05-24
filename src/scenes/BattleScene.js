@@ -553,9 +553,9 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     createMobileBattleButtons() {
-        const startX = this.scale.width - 70;
-        const startY = this.scale.height - 120;
-        const spacing = 90;
+        const startX = this.scale.width - 80;
+        const startY = this.scale.height - 130;
+        const spacing = 100;
         
         this.attackBtn = this.createMobileButton(startX, startY, '⚔️', '攻击', () => this.playerBasicAttack());
         this.skillBtn = this.createMobileButton(startX - spacing, startY, '🗡️', '武功', () => this.showSkillPanel());
@@ -564,22 +564,23 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     createMobileButton(x, y, icon, text, callback) {
-        const btn = this.add.circle(x, y, 40, 0x2d3a5c, 0.85);
+        const btn = this.add.circle(x, y, 42, 0x2d3a5c, 0.85);
         btn.setStrokeStyle(3, 0x4a5a8c);
         btn.setDepth(100);
         
         const iconText = this.add.text(x, y, icon, {
-            fontSize: '28px'
+            fontSize: '32px'
         }).setOrigin(0.5).setDepth(101);
         
-        const label = this.add.text(x, y + 50, text, {
-            fontSize: '16px',
+        const label = this.add.text(x, y + 55, text, {
+            fontSize: '14px',
             color: '#ffffff',
             fontFamily: 'Microsoft YaHei'
         }).setOrigin(0.5).setDepth(100);
         
         btn.setInteractive({ useHandCursor: true });
         
+        // 点击事件
         btn.on('pointerdown', () => {
             btn.setFillStyle(0x4a5a8c, 0.95);
             btn.setStrokeStyle(3, 0x6a7aac);
@@ -597,12 +598,14 @@ export default class BattleScene extends Phaser.Scene {
         });
         
         // 触屏事件
-        btn.on('touchstart', () => {
+        btn.on('touchstart', (pointer) => {
+            pointer.preventDefault();
             btn.setFillStyle(0x4a5a8c, 0.95);
             btn.setStrokeStyle(3, 0x6a7aac);
         });
         
-        btn.on('touchend', () => {
+        btn.on('touchend', (pointer) => {
+            pointer.preventDefault();
             btn.setFillStyle(0x2d3a5c, 0.85);
             btn.setStrokeStyle(3, 0x4a5a8c);
             callback();

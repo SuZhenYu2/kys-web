@@ -5,7 +5,6 @@ export default class TouchControls {
         this.scene = scene;
         this.isMobile = this.checkIfMobile();
         this.activeControls = new Set();
-        // 始终显示控件，方便测试
         this.showControls = true;
         this.createControls();
     }
@@ -17,139 +16,108 @@ export default class TouchControls {
     createControls() {
         if (!this.showControls) return;
 
-        this.createJoystick();
+        this.createDpad();
         this.createActionButtons();
     }
 
-    createJoystick() {
-        const joystickX = 120;
-        const joystickY = this.scene.scale.height - 120;
+    createDpad() {
+        const dpadX = 100;
+        const dpadY = this.scene.scale.height - 150;
         
-        // 创建摇杆背景
-        this.joystickBg = this.scene.add.circle(joystickX, joystickY, 70, 0x222222, 0.7);
-        this.joystickBg.setStrokeStyle(4, 0x444444);
-        this.joystickBg.setDepth(100);
+        // 创建方向键背景
+        this.dpadBg = this.scene.add.circle(dpadX, dpadY, 80, 0x000000, 0.5);
+        this.dpadBg.setStrokeStyle(4, 0x444444);
+        this.dpadBg.setDepth(100);
         
-        // 创建摇杆中心点
-        this.joystickStick = this.scene.add.circle(joystickX, joystickY, 40, 0x4a90d9, 0.8);
-        this.joystickStick.setStrokeStyle(3, 0x6ab0ff);
-        this.joystickStick.setDepth(101);
-        
-        this.joystickActive = false;
-        this.joystickOriginX = joystickX;
-        this.joystickOriginY = joystickY;
-        
-        // 设置可交互
-        this.joystickBg.setInteractive({ useHandCursor: true });
-        this.joystickStick.setInteractive({ useHandCursor: true, hitArea: new Phaser.Geom.Circle(0, 0, 40), hitAreaCallback: Phaser.Geom.Circle.Contains });
-        
-        // 绑定事件
-        this.joystickBg.on('pointerdown', (pointer) => this.onJoystickDown(pointer));
-        this.joystickStick.on('pointerdown', (pointer) => this.onJoystickDown(pointer));
-        
-        this.scene.input.on('pointermove', (pointer) => this.onJoystickMove(pointer));
-        this.scene.input.on('pointerup', () => this.onJoystickUp());
+        // 创建四个方向按钮
+        this.upBtn = this.createDpadButton(dpadX, dpadY - 50, '↑', 'up');
+        this.downBtn = this.createDpadButton(dpadX, dpadY + 50, '↓', 'down');
+        this.leftBtn = this.createDpadButton(dpadX - 50, dpadY, '←', 'left');
+        this.rightBtn = this.createDpadButton(dpadX + 50, dpadY, '→', 'right');
     }
 
-    onJoystickDown(pointer) {
-        this.joystickActive = true;
-        this.onJoystickMove(pointer);
-        this.joystickStick.setFillStyle(0x6ab0ff, 0.9);
-    }
-
-    onJoystickMove(pointer) {
-        if (!this.joystickActive) return;
+    createDpadButton(x, y, text, direction) {
+        const btn = this.scene.add.rectangle(x, y, 60, 60, 0x333333, 0.8);
+        btn.setStrokeStyle(3, 0x555555);
+        btn.setDepth(101);
         
-        // 计算相对于摇杆原点的位置
-        let dx = pointer.x - this.joystickOriginX;
-        let dy = pointer.y - this.joystickOriginY;
+        const btnText = this.scene.add.text(x, y, text, {
+            fontSize: '32px',
+            color: '#ffffff'
+        }).setOrigin(0.5).setDepth(102);
         
-        // 限制最大距离
-        const maxDistance = 50;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        btn.setInteractive({ useHandCursor: true });
         
-        if (distance > maxDistance) {
-            const ratio = maxDistance / distance;
-            dx *= ratio;
-            dy *= ratio;
-        }
+        // 触摸和点击事件
+        btn.on('pointerdown', () => {
+            btn.setFillStyle(0x555555, 1);
+            btn.setStrokeStyle(3, 0x888888);
+            this.activeControls.add(direction);
+        });
         
-        // 移动摇杆
-        this.joystickStick.x = this.joystickOriginX + dx;
-        this.joystickStick.y = this.joystickOriginY + dy;
+        btn.on('pointerup', () => {
+            btn.setFillStyle(0x333333, 0.8);
+            btn.setStrokeStyle(3, 0x555555);
+            this.activeControls.delete(direction);
+        });
         
-        // 处理方向输入
-        this.handleJoystickInput(dx, dy);
-    }
-
-    onJoystickUp() {
-        this.joystickActive = false;
-        this.joystickStick.x = this.joystickOriginX;
-        this.joystickStick.y = this.joystickOriginY;
-        this.joystickStick.setFillStyle(0x4a90d9, 0.8);
-        this.clearDirectionControls();
-    }
-
-    handleJoystickInput(dx, dy) {
-        const threshold = 15;
+        btn.on('pointerout', () => {
+            btn.setFillStyle(0x333333, 0.8);
+            btn.setStrokeStyle(3, 0x555555);
+            this.activeControls.delete(direction);
+        });
         
-        this.clearDirectionControls();
-
-        if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
-            const angle = Math.atan2(dy, dx);
-            const degree = (angle * 180 / Math.PI + 360) % 360;
-
-            if (degree >= 315 || degree < 45) {
-                this.activeControls.add('right');
-            } else if (degree >= 45 && degree < 135) {
-                this.activeControls.add('down');
-            } else if (degree >= 135 && degree < 225) {
-                this.activeControls.add('left');
-            } else if (degree >= 225 && degree < 315) {
-                this.activeControls.add('up');
-            }
-        }
-    }
-
-    clearDirectionControls() {
-        this.activeControls.delete('up');
-        this.activeControls.delete('down');
-        this.activeControls.delete('left');
-        this.activeControls.delete('right');
+        // 触屏事件
+        btn.on('touchstart', (pointer) => {
+            pointer.preventDefault();
+            btn.setFillStyle(0x555555, 1);
+            btn.setStrokeStyle(3, 0x888888);
+            this.activeControls.add(direction);
+        });
+        
+        btn.on('touchend', (pointer) => {
+            pointer.preventDefault();
+            btn.setFillStyle(0x333333, 0.8);
+            btn.setStrokeStyle(3, 0x555555);
+            this.activeControls.delete(direction);
+        });
+        
+        return { btn, btnText };
     }
 
     createActionButtons() {
-        const buttonSpacing = 90;
+        const buttonSpacing = 100;
         const startX = this.scene.scale.width - 80;
         const startY = this.scene.scale.height - 150;
 
+        // 互动按钮
         this.createActionButton(startX, startY, '⚔️', '互动', () => this.emitAction('space'));
+        
+        // 菜单按钮
         this.createActionButton(startX - buttonSpacing, startY, '📋', '菜单', () => this.emitAction('esc'));
+        
+        // 背包按钮
         this.createActionButton(startX - buttonSpacing * 2, startY, '🎒', '背包', () => this.emitAction('inventory'));
     }
 
     createActionButton(x, y, icon, label, callback) {
-        // 按钮背景
-        const btn = this.scene.add.circle(x, y, 38, 0x2d3a5c, 0.85);
+        const btn = this.scene.add.circle(x, y, 40, 0x2d3a5c, 0.85);
         btn.setStrokeStyle(3, 0x4a5a8c);
         btn.setDepth(100);
         
-        // 按钮图标
         const iconText = this.scene.add.text(x, y, icon, {
-            fontSize: '28px'
+            fontSize: '32px'
         }).setOrigin(0.5).setDepth(101);
         
-        // 按钮标签
-        const labelText = this.scene.add.text(x, y + 50, label, {
-            fontSize: '16px',
+        const labelText = this.scene.add.text(x, y + 55, label, {
+            fontSize: '14px',
             color: '#ffffff',
             fontFamily: 'Microsoft YaHei'
         }).setOrigin(0.5).setDepth(100);
         
-        // 设置可交互
         btn.setInteractive({ useHandCursor: true });
         
-        // 按钮事件
+        // 点击事件
         btn.on('pointerdown', () => {
             btn.setFillStyle(0x4a5a8c, 0.95);
             btn.setStrokeStyle(3, 0x6a7aac);
@@ -166,13 +134,15 @@ export default class TouchControls {
             btn.setStrokeStyle(3, 0x4a5a8c);
         });
         
-        // 为触屏设备添加 touch 事件
-        btn.on('touchstart', () => {
+        // 触屏事件
+        btn.on('touchstart', (pointer) => {
+            pointer.preventDefault();
             btn.setFillStyle(0x4a5a8c, 0.95);
             btn.setStrokeStyle(3, 0x6a7aac);
         });
         
-        btn.on('touchend', () => {
+        btn.on('touchend', (pointer) => {
+            pointer.preventDefault();
             btn.setFillStyle(0x2d3a5c, 0.85);
             btn.setStrokeStyle(3, 0x4a5a8c);
             callback();
@@ -197,7 +167,10 @@ export default class TouchControls {
     }
 
     destroy() {
-        if (this.joystickBg) this.joystickBg.destroy();
-        if (this.joystickStick) this.joystickStick.destroy();
+        if (this.dpadBg) this.dpadBg.destroy();
+        if (this.upBtn) this.upBtn.btn.destroy();
+        if (this.downBtn) this.downBtn.btn.destroy();
+        if (this.leftBtn) this.leftBtn.btn.destroy();
+        if (this.rightBtn) this.rightBtn.btn.destroy();
     }
 }
