@@ -1,0 +1,18 @@
+[
+  { "ID": 1, "Name": "铁剑", "ItemType": 1, "EquipType": 0, "Introduction": "普通的铁剑", "AddAttack": 10, "NeedFist": 0, "NeedSword": 10, "NeedKnife": 0, "NeedUnusual": 0, "NeedIQ": 10 },
+  { "ID": 2, "Name": "降龙十八掌秘籍", "ItemType": 2, "MagicID": 3, "Introduction": "天下至刚至阳的掌法", "NeedFist": 30, "NeedSword": 0, "NeedKnife": 0, "NeedUnusual": 0, "NeedIQ": 30 },
+  { "ID": 3, "Name": "打狗棒", "ItemType": 1, "EquipType": 0, "Introduction": "丐帮帮主信物", "AddAttack": 15, "AddSpeed": 10, "NeedFist": 20, "NeedSword": 0, "NeedKnife": 0, "NeedUnusual": 10, "NeedIQ": 40 },
+  { "ID": 4, "Name": "玄铁重剑", "ItemType": 1, "EquipType": 0, "Introduction": "重剑无锋，大巧不工", "AddAttack": 30, "AddDefence": 10, "NeedFist": 20, "NeedSword": 50, "NeedKnife": 0, "NeedUnusual": 0, "NeedIQ": 30 },
+  { "ID": 5, "Name": "独孤九剑秘籍", "ItemType": 2, "MagicID": 12, "Introduction": "无招胜有招的剑法", "NeedFist": 0, "NeedSword": 60, "NeedKnife": 0, "NeedUnusual": 0, "NeedIQ": 50 },
+  { "ID": 6, "Name": "金创药", "ItemType": 3, "Introduction": "治疗外伤的药物", "AddHP": 50 },
+  { "ID": 7, "Name": "小还丹", "ItemType": 3, "Introduction": "恢复内力的丹药", "AddMP": 30 },
+  { "ID": 8, "Name": "大还丹", "ItemType": 3, "Introduction": "大幅恢复生命", "AddHP": 200 },
+  { "ID": 9, "Name": "九花玉露丸", "ItemType": 3, "Introduction": "桃花岛灵药", "AddHP": 100, "AddMP": 50 },
+  { "ID": 10, "Name": "黑玉断续膏", "ItemType": 3, "Introduction": "接骨疗伤圣药", "AddHP": 300, "AddMaxHP": 10 },
+  { "ID": 11, "Name": "铁甲", "ItemType": 1, "EquipType": 1, "Introduction": "普通铁甲", "AddDefence": 15 },
+  { "ID": 12, "Name": "软猬甲", "ItemType": 1, "EquipType": 1, "Introduction": "桃花岛宝甲", "AddDefence": 25, "AddAntiPoison": 20 },
+  { "ID": 13, "Name": "飞镖", "ItemType": 4, "Introduction": "普通暗器", "AddAttack": 8, "HiddenWeaponEffectID": 1 },
+  { "ID": 14, "Name": "含沙射影", "ItemType": 4, "Introduction": "带毒暗器", "AddAttack": 12, "AddAttackWithPoison": 10, "HiddenWeaponEffectID": 2 },
+  { "ID": 15, "Name": "九阳神功秘籍", "ItemType": 2, "MagicID": 14, "Introduction": "天下内功之冠", "NeedFist": 40, "NeedSword": 0, "NeedKnife": 0, "NeedUnusual": 30, "NeedIQ": 40 },
+  { "ID": 16, "Name": "乾坤大挪移秘籍", "ItemType": 2, "MagicID": 15, "Introduction": "明教至高心法", "NeedFist": 30, "NeedSword": 0, "NeedKnife": 0, "NeedUnusual": 40, "NeedIQ": 60 }
+]
