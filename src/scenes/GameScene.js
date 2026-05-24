@@ -9,6 +9,8 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('Game');
         this.gameManager = getGameManager();
+        this.targetPosition = null;
+        this.isMovingToTarget = false;
     }
 
     create() {
@@ -27,15 +29,6 @@ export default class GameScene extends Phaser.Scene {
         
         // 更新顶部状态栏
         this.updateStatusBar();
-    }
-
-    updateStatusBar() {
-        touchController.updateStatusBar({
-            hp: this.gameManager.player.hp,
-            maxHP: this.gameManager.player.maxHP,
-            mp: this.gameManager.player.mp,
-            maxMP: this.gameManager.player.maxMP
-        });
     }
 
     createMap() {
@@ -219,30 +212,64 @@ export default class GameScene extends Phaser.Scene {
     }
 
     setupTouchEvents() {
-        // 监听窗口事件
-        window.addEventListener('touch-action', (e) => {
-            const action = e.detail.action;
-            this.handleTouchAction(action);
+        // 监听点击移动事件
+        window.addEventListener('touch-move-to', (e) => {
+            if (!this.dialogActive) {
+                this.handleMoveToPoint(e.detail.clientX, e.detail.clientY);
+            }
         });
+        
+        // 监听按钮事件
+        window.addEventListener('touch-action', (e) => {
+            this.handleTouchAction(e.detail.action);
+        });
+    }
+
+    handleMoveToPoint(clientX, clientY) {
+        // 将屏幕坐标转换为游戏世界坐标
+        const worldPoint = this.cameras.main.getWorldPoint(clientX, clientY);
+        
+        // 检查是否点击了NPC或敌人
+        const clickedNPC = this.getClickedObject(this.npcs, worldPoint.x, worldPoint.y);
+        const clickedEnemy = this.getClickedObject(this.enemies, worldPoint.x, worldPoint.y);
+        
+        if (clickedNPC) {
+            // 点击了NPC，先移动过去再对话
+            this.targetPosition = { x: clickedNPC.x, y: clickedNPC.y };
+            this.targetNPC = clickedNPC;
+            this.targetEnemy = null;
+            this.isMovingToTarget = true;
+        } else if (clickedEnemy) {
+            // 点击了敌人，先移动过去再战斗
+            this.targetPosition = { x: clickedEnemy.x, y: clickedEnemy.y };
+            this.targetEnemy = clickedEnemy;
+            this.targetNPC = null;
+            this.isMovingToTarget = true;
+        } else {
+            // 点击了空地，直接移动
+            this.targetPosition = { x: worldPoint.x, y: worldPoint.y };
+            this.targetNPC = null;
+            this.targetEnemy = null;
+            this.isMovingToTarget = true;
+        }
+    }
+
+    getClickedObject(group, x, y) {
+        let clickedObject = null;
+        const clickRadius = 60;
+        
+        group.getChildren().forEach((obj) => {
+            const distance = Phaser.Math.Distance.Between(x, y, obj.x, obj.y);
+            if (distance < clickRadius) {
+                clickedObject = obj;
+            }
+        });
+        
+        return clickedObject;
     }
 
     handleTouchAction(action) {
         switch(action) {
-            case 'interact':
-                if (this.dialogActive) {
-                    this.closeDialog();
-                } else {
-                    const nearbyNPC = this.findNearbyNPC();
-                    if (nearbyNPC) {
-                        this.showDialog(nearbyNPC.name, nearbyNPC.dialog);
-                    } else {
-                        const nearbyEnemy = this.findNearbyEnemy();
-                        if (nearbyEnemy) {
-                            this.startBattle(nearbyEnemy);
-                        }
-                    }
-                }
-                break;
             case 'menu':
                 this.scene.get('UIScene').toggleMenu();
                 break;
@@ -300,8 +327,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update() {
-        // 处理触屏输入
-        this.handleTouchInput();
+        // 处理移动到目标
+        if (this.isMovingToTarget && this.targetPosition) {
+            this.updateMovement();
+        }
+        
+        // 键盘操作（保留支持）
+        this.player.update();
         
         // 键盘关闭对话框
         if (this.dialogActive && Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('SPACE'))) {
@@ -309,33 +341,42 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    handleTouchInput() {
-        const direction = touchController.getDirection();
-        const hasTouchInput = direction.up || direction.down || direction.left || direction.right;
+    updateMovement() {
+        const dx = this.targetPosition.x - this.player.x;
+        const dy = this.targetPosition.y - this.player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
         
-        if (hasTouchInput) {
-            this.updatePlayerFromDirection(direction);
-        } else {
-            // 如果没有触摸输入，则让Player使用键盘输入
-            this.player.update();
+        // 如果到达目标附近
+        if (distance < 30) {
+            this.player.setVelocity(0, 0);
+            this.isMovingToTarget = false;
+            
+            // 检查是否有目标NPC或敌人
+            if (this.targetNPC) {
+                this.showDialog(this.targetNPC.name, this.targetNPC.dialog);
+                this.targetNPC = null;
+            } else if (this.targetEnemy) {
+                this.startBattle(this.targetEnemy);
+                this.targetEnemy = null;
+            }
+            
+            return;
         }
+        
+        // 计算移动速度
+        const speed = 200;
+        const vx = (dx / distance) * speed;
+        const vy = (dy / distance) * speed;
+        
+        this.player.setVelocity(vx, vy);
     }
 
-    updatePlayerFromDirection(direction) {
-        let velocityX = 0;
-        let velocityY = 0;
-        const speed = 200;
-
-        if (direction.up) velocityY = -speed;
-        if (direction.down) velocityY = speed;
-        if (direction.left) velocityX = -speed;
-        if (direction.right) velocityX = speed;
-
-        if (velocityX !== 0 && velocityY !== 0) {
-            velocityX *= 0.707;
-            velocityY *= 0.707;
-        }
-
-        this.player.setVelocity(velocityX, velocityY);
+    updateStatusBar() {
+        touchController.updateStatusBar({
+            hp: this.gameManager.player.hp,
+            maxHP: this.gameManager.player.maxHP,
+            mp: this.gameManager.player.mp,
+            maxMP: this.gameManager.player.maxMP
+        });
     }
 }

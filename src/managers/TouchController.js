@@ -1,110 +1,85 @@
 export class TouchController {
     constructor() {
-        this.joystickActive = false;
-        this.joystickStartX = 0;
-        this.joystickStartY = 0;
-        this.direction = { up: false, down: false, left: false, right: false };
-        
+        this.targetPosition = null;
+        this.isMoving = false;
+        this.clickIndicator = null;
         this.init();
     }
 
     init() {
-        this.setupJoystick();
-        this.setupActionButtons();
+        this.clickIndicator = document.getElementById('click-indicator');
+        this.setupGameClickListener();
+        this.setupSideButtons();
+        this.setupBattleButtons();
     }
 
-    setupJoystick() {
-        const joystickArea = document.getElementById('joystick-area');
-        const joystickStick = document.getElementById('joystick-stick');
-        
-        if (!joystickArea || !joystickStick) return;
+    setupGameClickListener() {
+        const gameContainer = document.getElementById('game-container');
+        if (!gameContainer) return;
 
-        const startHandler = (e) => {
+        const handleClick = (e) => {
             e.preventDefault();
-            this.joystickActive = true;
-            joystickStick.classList.add('active');
+            e.stopPropagation();
             
-            const touch = e.touches ? e.touches[0] : e;
-            const rect = joystickArea.getBoundingClientRect();
-            this.joystickStartX = rect.left + rect.width / 2;
-            this.joystickStartY = rect.top + rect.height / 2;
+            // 获取点击位置（兼容touch和mouse）
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
-            this.handleJoystickMove(touch.clientX, touch.clientY);
+            // 显示点击指示器
+            this.showClickIndicator(clientX, clientY);
+            
+            // 触发事件通知游戏
+            this.emitMoveToPoint(clientX, clientY);
         };
 
-        const moveHandler = (e) => {
-            if (!this.joystickActive) return;
-            e.preventDefault();
-            
-            const touch = e.touches ? e.touches[0] : e;
-            this.handleJoystickMove(touch.clientX, touch.clientY);
-        };
-
-        const endHandler = (e) => {
-            if (!this.joystickActive) return;
-            e.preventDefault();
-            
-            this.joystickActive = false;
-            joystickStick.classList.remove('active');
-            this.resetJoystick();
-        };
-
-        joystickArea.addEventListener('mousedown', startHandler);
-        joystickArea.addEventListener('touchstart', startHandler, { passive: false });
-        
-        document.addEventListener('mousemove', moveHandler);
-        document.addEventListener('touchmove', moveHandler, { passive: false });
-        
-        document.addEventListener('mouseup', endHandler);
-        document.addEventListener('touchend', endHandler);
-        document.addEventListener('touchcancel', endHandler);
+        // 同时支持点击和触摸
+        gameContainer.addEventListener('click', handleClick);
+        gameContainer.addEventListener('touchstart', handleClick, { passive: false });
     }
 
-    handleJoystickMove(x, y) {
-        const joystickStick = document.getElementById('joystick-stick');
-        const joystickArea = document.getElementById('joystick-area');
+    showClickIndicator(x, y) {
+        if (!this.clickIndicator) return;
         
-        if (!joystickStick || !joystickArea) return;
-
-        const rect = joystickArea.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
+        this.clickIndicator.style.left = x + 'px';
+        this.clickIndicator.style.top = y + 'px';
+        this.clickIndicator.classList.remove('active');
         
-        let dx = x - centerX;
-        let dy = y - centerY;
+        // 重绘以重启动画
+        void this.clickIndicator.offsetWidth;
+        this.clickIndicator.classList.add('active');
         
-        const maxDistance = 40;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance > maxDistance) {
-            const ratio = maxDistance / distance;
-            dx *= ratio;
-            dy *= ratio;
-        }
-
-        joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-
-        const deadzone = 10;
-        this.direction.up = dy < -deadzone;
-        this.direction.down = dy > deadzone;
-        this.direction.left = dx < -deadzone;
-        this.direction.right = dx > deadzone;
+        // 动画结束后移除active类
+        setTimeout(() => {
+            if (this.clickIndicator) {
+                this.clickIndicator.classList.remove('active');
+            }
+        }, 500);
     }
 
-    resetJoystick() {
-        const joystickStick = document.getElementById('joystick-stick');
-        if (joystickStick) {
-            joystickStick.style.transform = 'translate(-50%, -50%)';
-        }
-        this.direction = { up: false, down: false, left: false, right: false };
+    emitMoveToPoint(clientX, clientY) {
+        const event = new CustomEvent('touch-move-to', {
+            detail: { clientX, clientY }
+        });
+        window.dispatchEvent(event);
     }
 
-    setupActionButtons() {
+    setupSideButtons() {
         const buttons = {
-            'btn-interact': 'interact',
             'btn-menu': 'menu',
             'btn-inventory': 'inventory',
-            'btn-skill': 'skill',
+            'btn-skill': 'skill'
+        };
+
+        Object.entries(buttons).forEach(([id, action]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                this.addButtonEvents(btn, action);
+            }
+        });
+    }
+
+    setupBattleButtons() {
+        const buttons = {
             'btn-battle-attack': 'battle-attack',
             'btn-battle-skill': 'battle-skill',
             'btn-battle-item': 'battle-item',
@@ -126,16 +101,8 @@ export class TouchController {
             this.emitAction(action);
         };
 
-        btn.addEventListener('mousedown', handlePress);
+        btn.addEventListener('click', handlePress);
         btn.addEventListener('touchstart', handlePress, { passive: false });
-        
-        btn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-        });
-    }
-
-    getDirection() {
-        return this.direction;
     }
 
     emitAction(action) {
@@ -146,15 +113,15 @@ export class TouchController {
     }
 
     setBattleMode(active) {
-        const exploreControls = document.getElementById('explore-controls');
         const battleControls = document.getElementById('battle-controls');
-        
-        if (exploreControls) {
-            exploreControls.style.display = active ? 'none' : 'flex';
-        }
+        const sideButtons = document.getElementById('side-buttons');
         
         if (battleControls) {
             battleControls.classList.toggle('active', active);
+        }
+        
+        if (sideButtons) {
+            sideButtons.style.display = active ? 'none' : 'flex';
         }
     }
 
