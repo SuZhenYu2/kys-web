@@ -1,0 +1,67 @@
+<h2>系统整体架构</h2>
+<p class="subtitle">金庸武侠 RPG - 实时同步型架构</p>
+
+<div class="mockup">
+  <div class="mockup-header">架构概览</div>
+  <div class="mockup-body">
+    <div style="display: flex; flex-direction: column; gap: 20px; font-family: monospace;">
+      
+      <!-- 客户端层 -->
+      <div style="border: 2px solid #4a90d9; border-radius: 8px; padding: 15px; background: #f0f7ff;">
+        <div style="font-weight: bold; color: #4a90d9; margin-bottom: 10px;">🎮 客户端层 (Web Browser)</div>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">游戏地图渲染 (Canvas/WebGL)</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">角色移动控制</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">聊天/对话 UI</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">WebSocket 连接管理</div>
+        </div>
+      </div>
+
+      <!-- 连接层 -->
+      <div style="text-align: center; color: #666;">↑ ↓ WebSocket 实时通信</div>
+
+      <!-- 网关层 -->
+      <div style="border: 2px solid #9b59b6; border-radius: 8px; padding: 15px; background: #f9f0ff;">
+        <div style="font-weight: bold; color: #9b59b6; margin-bottom: 10px;">🌐 网关层</div>
+        <div style="display: flex; gap: 15px;">
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white; flex: 1;">负载均衡 (Nginx)</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white; flex: 1;">WebSocket 网关</div>
+        </div>
+      </div>
+
+      <!-- 服务端层 -->
+      <div style="border: 2px solid #27ae60; border-radius: 8px; padding: 15px; background: #f0fff4;">
+        <div style="font-weight: bold; color: #27ae60; margin-bottom: 10px;">⚙️ 服务端层 (Spring Boot)</div>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">玩家会话管理</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">地图/场景管理</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">NPC 行为引擎</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">战斗系统</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">任务系统</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">DeepSeek AI 代理</div>
+        </div>
+      </div>
+
+      <!-- 数据层 -->
+      <div style="border: 2px solid #e67e22; border-radius: 8px; padding: 15px; background: #fff8f0;">
+        <div style="font-weight: bold; color: #e67e22; margin-bottom: 10px;">💾 数据层</div>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">MySQL (玩家数据)</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">Redis (实时状态缓存)</div>
+          <div style="border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; background: white;">DeepSeek API</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>核心数据流</h3>
+  <ol>
+    <li><strong>玩家移动</strong>：客户端 → WebSocket → 服务端验证 → Redis 更新位置 → 广播给视野内玩家</li>
+    <li><strong>NPC 行为</strong>：定时任务驱动 NPC 决策 → 更新位置/状态 → 广播给附近玩家</li>
+    <li><strong>AI 对话</strong>：玩家触发对话 → 收集上下文 → 调用 DeepSeek API → 返回 NPC 回复 → 广播</li>
+    <li><strong>玩家交互</strong>：战斗/交易/组队请求 → 服务端验证 → 状态变更 → 双方同步</li>
+  </ol>
+</div>
