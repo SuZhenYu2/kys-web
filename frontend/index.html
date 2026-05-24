@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金庸群侠传·江湖行</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="login-panel" class="panel">
+        <h1>金庸群侠传·江湖行</h1>
+        <form id="login-form">
+            <input type="text" id="username" placeholder="用户名" required>
+            <input type="password" id="password" placeholder="密码" required>
+            <div class="button-group">
+                <button type="submit" id="login-btn">登录</button>
+                <button type="button" id="register-btn">注册</button>
+            </div>
+        </form>
+        <p id="login-error" class="error-text hidden"></p>
+    </div>
+
+    <div id="register-panel" class="panel hidden">
+        <h1>创建角色</h1>
+        <form id="register-form">
+            <input type="text" id="reg-username" placeholder="用户名（3-50字符）" required>
+            <input type="password" id="reg-password" placeholder="密码（6-100字符）" required>
+            <input type="text" id="reg-nickname" placeholder="昵称（2-50字符）" required>
+            <input type="email" id="reg-email" placeholder="邮箱（可选）">
+            <div class="button-group">
+                <button type="submit" id="reg-submit">创建</button>
+                <button type="button" id="reg-cancel">返回</button>
+            </div>
+        </form>
+        <p id="register-error" class="error-text hidden"></p>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <div id="game-header">
+            <span id="player-info"></span>
+            <button id="logout-btn">退出</button>
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <div id="chat-panel">
+            <div id="chat-messages"></div>
+            <div id="chat-input-container">
+                <input type="text" id="chat-input" placeholder="输入聊天内容...">
+                <button id="chat-send">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.2/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
