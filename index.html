@@ -2,29 +2,205 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>武侠江湖</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
         body {
             background: #1a1a2e;
             overflow: hidden;
             font-family: 'Microsoft YaHei', sans-serif;
+            touch-action: none;
         }
         #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+        }
+        
+        /* 触屏控件样式 */
+        #touch-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        /* 方向键区域 */
+        .dpad-container {
+            position: absolute;
+            left: 20px;
+            bottom: 30px;
+            width: 150px;
+            height: 150px;
+            pointer-events: auto;
+        }
+        
+        .dpad-btn {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #4a5a8c;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        .dpad-btn:active {
+            background: #4a5a8c;
+            border-color: #6a7aac;
+        }
+        
+        .dpad-up {
+            left: 50px;
+            top: 0;
+        }
+        .dpad-down {
+            left: 50px;
+            top: 100px;
+        }
+        .dpad-left {
+            left: 0;
+            top: 50px;
+        }
+        .dpad-right {
+            left: 100px;
+            top: 50px;
+        }
+        
+        /* 动作按钮区域 */
+        .action-buttons {
+            position: absolute;
+            right: 20px;
+            bottom: 30px;
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+        
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(45, 58, 92, 0.85);
+            border: 3px solid #4a5a8c;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        .action-btn:active {
+            background: #4a5a8c;
+            border-color: #6a7aac;
+        }
+        
+        .action-btn-label {
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        /* 战斗场景按钮 */
+        #battle-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+        
+        #battle-controls.active {
+            display: block;
+        }
+        
+        .battle-buttons {
+            position: absolute;
+            right: 20px;
+            bottom: 30px;
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
         }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
+    
+    <!-- 探索场景触屏控件 -->
+    <div id="touch-controls">
+        <!-- 方向键 -->
+        <div class="dpad-container">
+            <div class="dpad-btn dpad-up" id="btn-up">↑</div>
+            <div class="dpad-btn dpad-down" id="btn-down">↓</div>
+            <div class="dpad-btn dpad-left" id="btn-left">←</div>
+            <div class="dpad-btn dpad-right" id="btn-right">→</div>
+        </div>
+        
+        <!-- 动作按钮 -->
+        <div class="action-buttons">
+            <div class="action-btn" id="btn-interact">
+                ⚔️
+                <div class="action-btn-label">互动</div>
+            </div>
+            <div class="action-btn" id="btn-menu">
+                📋
+                <div class="action-btn-label">菜单</div>
+            </div>
+            <div class="action-btn" id="btn-inventory">
+                🎒
+                <div class="action-btn-label">背包</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 战斗场景触屏控件 -->
+    <div id="battle-controls">
+        <div class="battle-buttons">
+            <div class="action-btn" id="btn-battle-attack">
+                ⚔️
+                <div class="action-btn-label">攻击</div>
+            </div>
+            <div class="action-btn" id="btn-battle-skill">
+                🗡️
+                <div class="action-btn-label">武功</div>
+            </div>
+            <div class="action-btn" id="btn-battle-item">
+                🎒
+                <div class="action-btn-label">物品</div>
+            </div>
+            <div class="action-btn" id="btn-battle-escape">
+                🏃
+                <div class="action-btn-label">逃跑</div>
+            </div>
+        </div>
+    </div>
+    
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>

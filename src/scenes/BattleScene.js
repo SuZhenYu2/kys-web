@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getGameManager } from '../managers/GameManager.js';
+import { touchController } from '../managers/TouchController.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -25,9 +26,6 @@ export default class BattleScene extends Phaser.Scene {
         this.battleEnded = false;
         this.buffs = [];
         this.selectedSkillIndex = 0;
-        
-        // 始终显示触屏按钮，方便测试
-        this.showMobileControls = true;
     }
 
     create() {
@@ -44,9 +42,34 @@ export default class BattleScene extends Phaser.Scene {
         
         this.updateSkillButtons();
         
-        if (this.showMobileControls) {
-            this.createMobileBattleButtons();
-        }
+        // 启用战斗按钮
+        touchController.setBattleMode(true);
+        
+        // 监听战斗按钮事件
+        this.setupBattleTouchEvents();
+    }
+
+    setupBattleTouchEvents() {
+        window.addEventListener('touch-action', (e) => {
+            if (this.battleEnded) return;
+            
+            const action = e.detail.action;
+            
+            switch(action) {
+                case 'battle-attack':
+                    this.playerBasicAttack();
+                    break;
+                case 'battle-skill':
+                    this.showSkillPanel();
+                    break;
+                case 'battle-item':
+                    this.showItemPanel();
+                    break;
+                case 'battle-escape':
+                    this.tryEscape();
+                    break;
+            }
+        });
     }
 
     createBattleBackground() {
@@ -99,189 +122,256 @@ export default class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5);
     }
 
-    createEnemyHPBar() {
-        this.enemyHPBarBg = this.add.rectangle(774, 130, 300, 30, 0x333333).setOrigin(0.5);
-        this.enemyHPBarFill = this.add.rectangle(774, 130, 300, 30, 0xd94a4a).setOrigin(0.5);
-        this.enemyHPBarText = this.add.text(774, 130, `${this.enemyHP}/${this.enemyMaxHP}`, {
+    createHPBar(x, y, label, current, max, color, isPlayer) {
+        this.add.text(x, y, label, {
             fontSize: '16px',
             color: '#ffffff',
             fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5);
-    }
-
-    createHPBar(x, y, label, current, max, color, isPlayer = false) {
-        if (isPlayer) {
-            this.playerHPBarBg = this.add.rectangle(x, y, 300, 30, 0x333333).setOrigin(0, 0.5);
-            this.playerHPBarFill = this.add.rectangle(x, y, 300, 30, color).setOrigin(0, 0.5);
-            this.playerHPBarText = this.add.text(x + 150, y, `${current}/${max}`, {
-                fontSize: '16px',
-                color: '#ffffff',
-                fontFamily: 'Microsoft YaHei'
-            }).setOrigin(0.5);
-        }
-    }
-
-    createMPBar(x, y, label, current, max, color, isPlayer = false) {
-        if (isPlayer) {
-            this.playerMPBarBg = this.add.rectangle(x, y, 300, 25, 0x333333).setOrigin(0, 0.5);
-            this.playerMPBarFill = this.add.rectangle(x, y, 300, 25, color).setOrigin(0, 0.5);
-            this.playerMPBarText = this.add.text(x + 150, y, `${current}/${max}`, {
-                fontSize: '14px',
-                color: '#ffffff',
-                fontFamily: 'Microsoft YaHei'
-            }).setOrigin(0.5);
-        }
-    }
-
-    updateHPBars() {
-        const hpRatio = Math.max(0, this.playerHP / this.playerMaxHP);
-        this.playerHPBarFill.setScale(hpRatio, 1);
-        this.playerHPBarText.setText(`${Math.max(0, this.playerHP)}/${this.playerMaxHP}`);
+        });
         
-        const enemyHPRatio = Math.max(0, this.enemyHP / this.enemyMaxHP);
-        this.enemyHPBarFill.setScale(enemyHPRatio, 1);
-        this.enemyHPBarText.setText(`${Math.max(0, this.enemyHP)}/${this.enemyMaxHP}`);
+        const bgBar = this.add.rectangle(x + 40, y + 8, 200, 20, 0x333333);
+        bgBar.setOrigin(0, 0.5);
+        
+        const hpPercent = current / max;
+        const hpBar = this.add.rectangle(x + 40, y + 8, 200 * hpPercent, 20, isPlayer ? 0x4CAF50 : 0xd94a4a);
+        hpBar.setOrigin(0, 0.5);
+        
+        const hpText = this.add.text(x + 250, y + 8, `${current}/${max}`, {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei'
+        });
+        hpText.setOrigin(0, 0.5);
+        
+        if (isPlayer) {
+            this.playerHPBar = hpBar;
+            this.playerHPText = hpText;
+        }
     }
 
-    updateMPBars() {
-        const mpRatio = Math.max(0, this.playerMP / this.playerMaxMP);
-        this.playerMPBarFill.setScale(mpRatio, 1);
-        this.playerMPBarText.setText(`${Math.max(0, this.playerMP)}/${this.playerMaxMP}`);
+    createMPBar(x, y, label, current, max, color, isPlayer) {
+        this.add.text(x, y, label, {
+            fontSize: '16px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei'
+        });
+        
+        const bgBar = this.add.rectangle(x + 40, y + 8, 200, 20, 0x333333);
+        bgBar.setOrigin(0, 0.5);
+        
+        const mpPercent = current / max;
+        const mpBar = this.add.rectangle(x + 40, y + 8, 200 * mpPercent, 20, 0x2196F3);
+        mpBar.setOrigin(0, 0.5);
+        
+        const mpText = this.add.text(x + 250, y + 8, `${current}/${max}`, {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei'
+        });
+        mpText.setOrigin(0, 0.5);
+        
+        if (isPlayer) {
+            this.playerMPBar = mpBar;
+            this.playerMPText = mpText;
+        }
+    }
+
+    createEnemyHPBar() {
+        const x = 700;
+        const y = 90;
+        
+        const bgBar = this.add.rectangle(x, y, 200, 20, 0x333333);
+        bgBar.setOrigin(0.5, 0);
+        
+        const hpPercent = this.enemyHP / this.enemyMaxHP;
+        const hpBar = this.add.rectangle(x - 100, y, 200 * hpPercent, 20, 0xd94a4a);
+        hpBar.setOrigin(0, 0);
+        
+        const hpText = this.add.text(x, y + 25, `${this.enemyHP}/${this.enemyMaxHP}`, {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei'
+        });
+        hpText.setOrigin(0.5, 0);
+        
+        this.enemyHPBar = hpBar;
+        this.enemyHPText = hpText;
     }
 
     createBattleMenu() {
-        this.menuContainer = this.add.container(512, 620);
+        const menuContainer = this.add.container(512, 700);
         
-        this.add.text(-350, -40, '战斗选项', {
-            fontSize: '18px',
-            color: '#ffd700',
-            fontFamily: 'Microsoft YaHei'
+        const bg = this.add.rectangle(0, 0, 800, 100, 0x1a1a2a, 0.95);
+        bg.setStrokeStyle(2, 0x4a5a8c);
+        
+        const buttons = [
+            { text: '[1] 武功', x: -250, action: 'skill' },
+            { text: '[2] 物品', x: -80, action: 'item' },
+            { text: '[3] 攻击', x: 80, action: 'attack' },
+            { text: '[4] 逃跑', x: 250, action: 'escape' }
+        ];
+        
+        this.menuButtons = [];
+        
+        buttons.forEach((btn, index) => {
+            const btnText = this.add.text(btn.x, 0, btn.text, {
+                fontSize: '24px',
+                color: '#ffffff',
+                fontFamily: 'Microsoft YaHei'
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+            
+            btnText.btnAction = btn.action;
+            btnText.btnIndex = index;
+            
+            btnText.on('pointerover', () => {
+                btnText.setColor('#ffd700');
+            });
+            
+            btnText.on('pointerout', () => {
+                btnText.setColor('#ffffff');
+            });
+            
+            btnText.on('pointerdown', () => {
+                this.handleMenuAction(btn.action);
+            });
+            
+            this.menuButtons.push(btnText);
+            menuContainer.add(btnText);
         });
         
-        this.createMenuButton('武功 [1]', -250, 0, () => this.showSkillPanel());
-        this.createMenuButton('物品 [2]', -125, 0, () => this.showItemPanel());
-        this.createMenuButton('攻击 [3]', 0, 0, () => this.playerBasicAttack());
-        this.createMenuButton('逃跑 [4]', 125, 0, () => this.tryEscape());
-    }
-
-    createMenuButton(text, x, y, callback) {
-        const button = this.add.text(x, y, text, {
-            fontSize: '20px',
-            color: '#ffffff',
-            backgroundColor: '#2d3a5c',
-            padding: { left: 20, right: 20, top: 10, bottom: 10 },
-            fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        button.on('pointerover', () => {
-            button.setStyle({ backgroundColor: '#4a5a8c' });
-        });
-        
-        button.on('pointerout', () => {
-            button.setStyle({ backgroundColor: '#2d3a5c' });
-        });
-        
-        button.on('pointerdown', callback);
-        
-        this.menuContainer.add(button);
-        return button;
+        menuContainer.add(bg);
     }
 
     createSkillPanel() {
-        this.skillPanel = this.add.container(512, 384).setVisible(false);
+        this.skillPanel = this.add.container(512, 400);
+        this.skillPanel.setVisible(false);
         
-        const bg = this.add.rectangle(0, 0, 600, 450, 0x1a2a4a, 0.98);
+        const bg = this.add.rectangle(0, 0, 600, 400, 0x1a1a2a, 0.98);
         bg.setStrokeStyle(3, 0xffd700);
+        this.skillPanel.add(bg);
         
-        this.add.text(0, -200, '选择武功', {
+        const title = this.add.text(0, -170, '选择武功', {
             fontSize: '28px',
             color: '#ffd700',
             fontFamily: 'Microsoft YaHei'
         }).setOrigin(0.5);
-        
-        this.add.text(0, -170, '按数字键 1-4 选择，空格或点击使用', {
-            fontSize: '14px',
-            color: '#888888',
-            fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5);
+        this.skillPanel.add(title);
         
         this.skillButtons = [];
-        this.skillButtonTexts = [];
+        this.skillNames = ['普通攻击'];
         
-        const startY = -120;
-        for (let i = 0; i < 4; i++) {
-            const skillBtn = this.add.container(0, startY + i * 70);
-            
-            const bg = this.add.rectangle(0, 0, 500, 60, 0x2d3a5c, 0.8);
-            bg.setStrokeStyle(1, 0x4a5a8c);
-            
-            const nameText = this.add.text(-220, 0, '', {
-                fontSize: '20px',
+        const skills = this.gameManager.player.skills || [];
+        skills.forEach((skill, index) => {
+            if (!this.skillNames.includes(skill.name)) {
+                this.skillNames.push(skill.name);
+            }
+        });
+        
+        this.skillNames.forEach((skillName, index) => {
+            const btn = this.add.text(-200, -100 + index * 60, `[${index + 1}] ${skillName}`, {
+                fontSize: '22px',
                 color: '#ffffff',
                 fontFamily: 'Microsoft YaHei'
-            }).setOrigin(0, 0.5);
+            }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
             
-            const infoText = this.add.text(100, 0, '', {
-                fontSize: '16px',
-                color: '#888888',
-                fontFamily: 'Microsoft YaHei'
-            }).setOrigin(0, 0.5);
+            btn.skillIndex = index;
             
-            const costText = this.add.text(200, 0, '', {
-                fontSize: '16px',
-                color: '#6666ff',
-                fontFamily: 'Microsoft YaHei'
-            }).setOrigin(0, 0.5);
+            btn.on('pointerover', () => {
+                btn.setColor('#ffd700');
+            });
             
-            skillBtn.add([bg, nameText, infoText, costText]);
-            this.skillPanel.add(skillBtn);
+            btn.on('pointerout', () => {
+                btn.setColor('#ffffff');
+            });
             
-            this.skillButtons.push(skillBtn);
-            this.skillButtonTexts.push({ bg, nameText, infoText, costText });
-            
-            skillBtn.setSize(500, 60);
-            skillBtn.setInteractive({ useHandCursor: true });
-            
-            const index = i;
-            skillBtn.on('pointerdown', () => {
+            btn.on('pointerdown', () => {
                 this.selectAndUseSkill(index);
             });
-        }
+            
+            this.skillButtons.push(btn);
+            this.skillPanel.add(btn);
+        });
         
-        this.skillPanel.add(bg);
-        
-        this.add.text(0, 190, '按 ESC 返回', {
-            fontSize: '16px',
+        const closeBtn = this.add.text(250, -170, '返回', {
+            fontSize: '22px',
             color: '#888888',
             fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5);
+        }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+        
+        closeBtn.on('pointerover', () => {
+            closeBtn.setColor('#ffd700');
+        });
+        
+        closeBtn.on('pointerout', () => {
+            closeBtn.setColor('#888888');
+        });
+        
+        closeBtn.on('pointerdown', () => {
+            this.hideSkillPanel();
+        });
+        
+        this.skillPanel.add(closeBtn);
     }
 
     updateSkillButtons() {
-        const skills = this.gameManager.player.skills;
+        if (this.skillButtons) {
+            this.skillButtons.forEach(btn => btn.destroy());
+            this.skillButtons = [];
+            this.skillNames = ['普通攻击'];
+            
+            const skills = this.gameManager.player.skills || [];
+            skills.forEach((skill, index) => {
+                if (!this.skillNames.includes(skill.name)) {
+                    this.skillNames.push(skill.name);
+                }
+            });
+            
+            this.skillNames.forEach((skillName, index) => {
+                const btn = this.add.text(-200, -100 + index * 60, `[${index + 1}] ${skillName}`, {
+                    fontSize: '22px',
+                    color: '#ffffff',
+                    fontFamily: 'Microsoft YaHei'
+                }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+                
+                btn.skillIndex = index;
+                
+                btn.on('pointerover', () => {
+                    btn.setColor('#ffd700');
+                });
+                
+                btn.on('pointerout', () => {
+                    btn.setColor('#ffffff');
+                });
+                
+                btn.on('pointerdown', () => {
+                    this.selectAndUseSkill(index);
+                });
+                
+                this.skillButtons.push(btn);
+                this.skillPanel.add(btn);
+            });
+        }
+    }
+
+    createBattleLog() {
+        const logContainer = this.add.container(512, 350);
         
-        this.skillButtons.forEach((btn, i) => {
-            if (i < skills.length) {
-                const skill = skills[i];
-                const texts = this.skillButtonTexts[i];
-                
-                texts.bg.setFillStyle(0x2d3a5c, 0.8);
-                texts.nameText.setText(`${i + 1}. ${skill.name} Lv.${skill.level}`);
-                texts.nameText.setColor(Phaser.Display.Color.HexStringToColor(skill.color).rgba);
-                texts.infoText.setText(`伤害: ${skill.damage}`);
-                texts.costText.setText(`${skill.mpCost}内力`);
-                
-                btn.setVisible(true);
-            } else {
-                btn.setVisible(false);
-            }
-        });
+        const bg = this.add.rectangle(0, 0, 400, 80, 0x000000, 0.7);
+        logContainer.add(bg);
+        
+        this.logText = this.add.text(0, 0, '战斗开始！', {
+            fontSize: '18px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei',
+            wordWrap: { width: 380 },
+            align: 'center'
+        }).setOrigin(0.5);
+        logContainer.add(this.logText);
+        
+        this.battleLogContainer = logContainer;
     }
 
     showSkillPanel() {
-        if (this.turn !== 'player' || this.battleEnded) return;
-        
-        this.updateSkillButtons();
         this.skillPanel.setVisible(true);
         this.selectedSkillIndex = 0;
         this.highlightSelectedSkill();
@@ -292,326 +382,173 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     highlightSelectedSkill() {
-        this.skillButtonTexts.forEach((texts, i) => {
-            if (i === this.selectedSkillIndex) {
-                texts.bg.setFillStyle(0x5a6a9c, 0.8);
-                texts.bg.setStrokeStyle(2, 0xffd700);
-            } else {
-                texts.bg.setFillStyle(0x2d3a5c, 0.8);
-                texts.bg.setStrokeStyle(1, 0x4a5a8c);
-            }
-        });
-    }
-
-    selectAndUseSkill(index) {
-        const skills = this.gameManager.player.skills;
-        if (index >= skills.length) return;
-        
-        const skill = skills[index];
-        
-        if (this.playerMP < skill.mpCost) {
-            this.addBattleLog(`内力不足，无法使用 ${skill.name}！`);
-            return;
-        }
-        
-        this.useSkill(skill);
-    }
-
-    useSkill(skill) {
-        if (this.turn !== 'player' || this.battleEnded) return;
-        
-        this.playerMP -= skill.mpCost;
-        this.updateMPBars();
-        
-        this.addBattleLog(`你施展了「${skill.name}」！`);
-        
-        let damage = this.gameManager.calculateDamage(skill, this.enemyData.attack || 10);
-        
-        if (skill.type === 'heal') {
-            const healAmount = Math.abs(skill.damage);
-            this.playerHP = Math.min(this.playerMaxHP, this.playerHP + healAmount);
-            this.addBattleLog(`恢复了 ${healAmount} 点生命！`);
-            this.updateHPBars();
-        } else if (skill.type === 'buff') {
-            this.applyBuff(skill);
-            damage = Math.floor(damage * 0.5);
-            this.enemyHP -= damage;
-            this.addBattleLog(`造成了 ${damage} 点伤害！并获得增益效果！`);
-        } else {
-            this.enemyHP -= damage;
-            this.addBattleLog(`造成了 ${damage} 点伤害！`);
-        }
-        
-        if (skill.effect && skill.effect.type === 'poison') {
-            this.enemyPoisonTurns = skill.effect.duration;
-            this.addBattleLog(`${this.enemyName} 中毒了！`);
-        }
-        
-        this.animateAttack(this.playerSprite, this.enemySprite);
-        this.updateHPBars();
-        
-        if (this.enemyHP <= 0) {
-            this.endBattle(true);
-        } else {
-            this.turn = 'enemy';
-            this.time.delayedCall(1000, () => this.enemyTurn());
-        }
-    }
-
-    applyBuff(skill) {
-        const buff = {
-            name: skill.name,
-            type: skill.effect.type,
-            value: skill.effect.value,
-            duration: skill.effect.duration,
-            turnsRemaining: skill.effect.duration
-        };
-        
-        this.buffs.push(buff);
-        
-        switch (buff.type) {
-            case 'attack_boost':
-                this.buffAttack = buff.value;
-                break;
-            case 'defense_boost':
-                this.buffDefense = buff.value;
-                break;
-            case 'speed_boost':
-                this.buffSpeed = buff.value;
-                break;
-        }
-    }
-
-    processBuffs() {
-        this.buffs = this.buffs.filter(buff => {
-            if (buff.type === 'poison') {
-                const poisonDamage = buff.value;
-                this.playerHP -= poisonDamage;
-                this.addBattleLog(`中毒效果造成了 ${poisonDamage} 点伤害！`);
-                this.updateHPBars();
-            }
-            
-            buff.turnsRemaining--;
-            
-            if (buff.turnsRemaining <= 0) {
-                switch (buff.type) {
-                    case 'attack_boost':
-                        this.buffAttack = 0;
-                        break;
-                    case 'defense_boost':
-                        this.buffDefense = 0;
-                        break;
-                    case 'speed_boost':
-                        this.buffSpeed = 0;
-                        break;
-                }
-                this.addBattleLog(`${buff.name} 效果消失了`);
-                return false;
-            }
-            
-            return true;
+        this.skillButtons.forEach((btn, index) => {
+            btn.setColor(index === this.selectedSkillIndex ? '#ffd700' : '#ffffff');
         });
     }
 
     showItemPanel() {
-        if (this.turn !== 'player' || this.battleEnded) return;
+        this.addBattleLog('物品系统开发中...');
+    }
+
+    handleMenuAction(action) {
+        if (this.battleEnded || this.turn !== 'player') return;
         
-        this.addBattleLog('战斗中物品系统开发中...');
+        switch(action) {
+            case 'skill':
+                this.showSkillPanel();
+                break;
+            case 'item':
+                this.showItemPanel();
+                break;
+            case 'attack':
+                this.playerBasicAttack();
+                break;
+            case 'escape':
+                this.tryEscape();
+                break;
+        }
     }
 
     playerBasicAttack() {
-        if (this.turn !== 'player' || this.battleEnded) return;
+        if (this.battleEnded || this.turn !== 'player') return;
         
-        const basicAttack = this.gameManager.player.skills.find(s => s.id === 'basicAttack');
-        if (basicAttack) {
-            this.useSkill(basicAttack);
+        this.turn = 'enemy';
+        this.playerAttack(this.enemyAtk);
+    }
+
+    selectAndUseSkill(index) {
+        if (this.battleEnded || this.turn !== 'player') return;
+        
+        this.hideSkillPanel();
+        this.turn = 'enemy';
+        
+        if (index === 0) {
+            this.playerAttack(this.enemyAtk);
         } else {
-            const damage = this.gameManager.player.attack;
-            this.enemyHP -= damage;
-            this.addBattleLog(`你发动攻击，造成 ${damage} 点伤害！`);
-            
-            this.animateAttack(this.playerSprite, this.enemySprite);
-            this.updateHPBars();
-            
-            if (this.enemyHP <= 0) {
-                this.endBattle(true);
-            } else {
-                this.turn = 'enemy';
-                this.time.delayedCall(1000, () => this.enemyTurn());
+            const skills = this.gameManager.player.skills || [];
+            const skillIndex = index - 1;
+            if (skills[skillIndex]) {
+                this.addBattleLog(`${this.gameManager.player.name}使用了${skills[skillIndex].name}！`);
+                this.playerAttack(Math.floor(this.enemyAtk * (1 + skills[skillIndex].damage / 100)));
             }
         }
     }
 
-    tryEscape() {
-        if (this.turn !== 'player' || this.battleEnded) return;
-        
-        const escapeChance = Math.random();
-        if (escapeChance > 0.4) {
-            this.addBattleLog('逃跑成功！');
-            this.time.delayedCall(1000, () => this.endBattle(false, true));
-        } else {
-            this.addBattleLog('逃跑失败！');
-            this.turn = 'enemy';
-            this.time.delayedCall(1000, () => this.enemyTurn());
-        }
+    playerAttack(damage) {
+        this.tweens.add({
+            targets: this.playerSprite,
+            x: '+=100',
+            duration: 200,
+            yoyo: true,
+            onComplete: () => {
+                const actualDamage = Math.max(1, damage + Math.floor(Math.random() * 5) - 2);
+                this.enemyHP = Math.max(0, this.enemyHP - actualDamage);
+                
+                this.updateEnemyHP();
+                this.addBattleLog(`${this.gameManager.player.name}对${this.enemyName}造成了${actualDamage}点伤害！`);
+                
+                this.tweens.add({
+                    targets: this.enemySprite,
+                    alpha: 0.3,
+                    duration: 100,
+                    yoyo: true,
+                    repeat: 2,
+                    onComplete: () => {
+                        if (this.enemyHP <= 0) {
+                            this.endBattle(true);
+                        } else {
+                            this.enemyTurn();
+                        }
+                    }
+                });
+            }
+        });
     }
 
     enemyTurn() {
-        if (this.battleEnded) return;
-        
-        this.processBuffs();
-        
-        if (this.playerHP <= 0) {
-            this.endBattle(false);
-            return;
-        }
-        
-        const damage = Phaser.Math.Between(this.enemyAtk - 5, this.enemyAtk + 5);
-        const finalDamage = Math.max(1, damage - this.gameManager.player.defense - (this.buffDefense || 0));
-        
-        this.playerHP -= finalDamage;
-        this.addBattleLog(`${this.enemyName} 发动攻击，造成 ${finalDamage} 点伤害！`);
-        
-        this.animateAttack(this.enemySprite, this.playerSprite);
-        this.updateHPBars();
-        
-        if (this.playerHP <= 0) {
-            this.endBattle(false);
-        } else {
-            this.turn = 'player';
-        }
-    }
-
-    animateAttack(attacker, target) {
-        this.tweens.add({
-            targets: attacker,
-            x: attacker.x + (target.x > attacker.x ? 80 : -80),
-            duration: 200,
-            yoyo: true,
-            ease: 'Power2'
-        });
-        
-        this.tweens.add({
-            targets: target,
-            alpha: 0.3,
-            duration: 100,
-            yoyo: true,
-            repeat: 2
+        this.time.delayedCall(800, () => {
+            if (this.battleEnded) return;
+            
+            this.tweens.add({
+                targets: this.enemySprite,
+                x: '-=100',
+                duration: 200,
+                yoyo: true,
+                onComplete: () => {
+                    const damage = Math.max(1, 15 + Math.floor(Math.random() * 10) - 5);
+                    this.playerHP = Math.max(0, this.playerHP - damage);
+                    
+                    this.updatePlayerHP();
+                    this.addBattleLog(`${this.enemyName}对${this.gameManager.player.name}造成了${damage}点伤害！`);
+                    
+                    this.tweens.add({
+                        targets: this.playerSprite,
+                        alpha: 0.3,
+                        duration: 100,
+                        yoyo: true,
+                        repeat: 2,
+                        onComplete: () => {
+                            if (this.playerHP <= 0) {
+                                this.endBattle(false);
+                            } else {
+                                this.turn = 'player';
+                            }
+                        }
+                    });
+                }
+            });
         });
     }
 
-    createBattleLog() {
-        this.battleLog = [];
-        this.battleLogText = this.add.text(100, 550, '', {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontFamily: 'Microsoft YaHei',
-            wordWrap: { width: 824 }
-        });
+    updatePlayerHP() {
+        const hpPercent = this.playerHP / this.playerMaxHP;
+        this.playerHPBar.width = 200 * hpPercent;
+        this.playerHPText.text = `${this.playerHP}/${this.playerMaxHP}`;
+    }
+
+    updateEnemyHP() {
+        const hpPercent = this.enemyHP / this.enemyMaxHP;
+        this.enemyHPBar.width = 200 * hpPercent;
+        this.enemyHPText.text = `${this.enemyHP}/${this.enemyMaxHP}`;
     }
 
     addBattleLog(text) {
-        this.battleLog.push(text);
-        if (this.battleLog.length > 4) {
-            this.battleLog.shift();
-        }
-        this.battleLogText.setText(this.battleLog.join('\n'));
+        this.logText.text = text;
+    }
+
+    tryEscape() {
+        if (this.battleEnded || this.turn !== 'player') return;
+        
+        this.addBattleLog('逃跑中...');
+        this.time.delayedCall(500, () => {
+            this.endBattle(false, true);
+        });
     }
 
     endBattle(victory, escaped = false) {
         this.battleEnded = true;
-        this.hideSkillPanel();
         
         if (victory) {
-            const expGain = Math.floor(this.enemyMaxHP * 2);
-            const goldGain = Math.floor(this.enemyMaxHP);
-            
-            this.addBattleLog(`战斗胜利！击败了 ${this.enemyName}！`);
-            this.addBattleLog(`获得 ${expGain} 点经验，${goldGain} 两银子`);
-            
-            const expResult = this.gameManager.gainExp(expGain);
-            this.gameManager.player.gold += goldGain;
-            
-            if (expResult.levelUps > 0) {
-                this.addBattleLog(`升级了！现在是 ${this.gameManager.player.level} 级！`);
-            }
-            
+            this.addBattleLog('战斗胜利！');
             this.gameManager.player.hp = this.playerHP;
             this.gameManager.player.mp = this.playerMP;
-            
+            this.gameManager.gainExp(50);
         } else if (escaped) {
-            this.addBattleLog('成功逃离战斗！');
+            this.addBattleLog('成功逃跑！');
+            this.gameManager.player.hp = this.playerHP;
+            this.gameManager.player.mp = this.playerMP;
         } else {
             this.addBattleLog('战斗失败...');
+            this.gameManager.player.hp = Math.floor(this.gameManager.player.maxHP * 0.3);
+            this.gameManager.player.mp = Math.floor(this.gameManager.player.maxMP * 0.3);
         }
         
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(1500, () => {
+            touchController.setBattleMode(false);
             this.scene.stop('Battle');
             this.scene.resume('Game');
-            this.scene.get('Game').inBattle = false;
         });
-    }
-
-    createMobileBattleButtons() {
-        const startX = this.scale.width - 80;
-        const startY = this.scale.height - 130;
-        const spacing = 100;
-        
-        this.attackBtn = this.createMobileButton(startX, startY, '⚔️', '攻击', () => this.playerBasicAttack());
-        this.skillBtn = this.createMobileButton(startX - spacing, startY, '🗡️', '武功', () => this.showSkillPanel());
-        this.itemBtn = this.createMobileButton(startX - spacing * 2, startY, '🎒', '物品', () => this.showItemPanel());
-        this.escapeBtn = this.createMobileButton(startX - spacing * 3, startY, '🏃', '逃跑', () => this.tryEscape());
-    }
-
-    createMobileButton(x, y, icon, text, callback) {
-        const btn = this.add.circle(x, y, 42, 0x2d3a5c, 0.85);
-        btn.setStrokeStyle(3, 0x4a5a8c);
-        btn.setDepth(100);
-        
-        const iconText = this.add.text(x, y, icon, {
-            fontSize: '32px'
-        }).setOrigin(0.5).setDepth(101);
-        
-        const label = this.add.text(x, y + 55, text, {
-            fontSize: '14px',
-            color: '#ffffff',
-            fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5).setDepth(100);
-        
-        btn.setInteractive({ useHandCursor: true });
-        
-        // 点击事件
-        btn.on('pointerdown', () => {
-            btn.setFillStyle(0x4a5a8c, 0.95);
-            btn.setStrokeStyle(3, 0x6a7aac);
-        });
-        
-        btn.on('pointerup', () => {
-            btn.setFillStyle(0x2d3a5c, 0.85);
-            btn.setStrokeStyle(3, 0x4a5a8c);
-            callback();
-        });
-        
-        btn.on('pointerout', () => {
-            btn.setFillStyle(0x2d3a5c, 0.85);
-            btn.setStrokeStyle(3, 0x4a5a8c);
-        });
-        
-        // 触屏事件
-        btn.on('touchstart', (pointer) => {
-            pointer.preventDefault();
-            btn.setFillStyle(0x4a5a8c, 0.95);
-            btn.setStrokeStyle(3, 0x6a7aac);
-        });
-        
-        btn.on('touchend', (pointer) => {
-            pointer.preventDefault();
-            btn.setFillStyle(0x2d3a5c, 0.85);
-            btn.setStrokeStyle(3, 0x4a5a8c);
-            callback();
-        });
-        
-        return { btn, iconText, label };
     }
 
     update() {
