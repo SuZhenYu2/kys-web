@@ -3,6 +3,7 @@ import Player from '../objects/Player.js';
 import NPC from '../objects/NPC.js';
 import Enemy from '../objects/Enemy.js';
 import { getGameManager } from '../managers/GameManager.js';
+import TouchControls from '../managers/TouchControls.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -21,6 +22,9 @@ export default class GameScene extends Phaser.Scene {
         
         this.createCollisions();
         this.createDialogSystem();
+        
+        this.touchControls = new TouchControls(this);
+        this.setupTouchEvents();
     }
 
     createMap() {
@@ -401,11 +405,106 @@ export default class GameScene extends Phaser.Scene {
         this.player.unfreeze();
     }
 
+    setupTouchEvents() {
+        this.events.on('touch-action', (action) => {
+            switch(action) {
+                case 'space':
+                    this.handleTouchAction();
+                    break;
+                case 'esc':
+                    this.scene.get('UIScene').toggleMenu();
+                    break;
+                case 'inventory':
+                    this.scene.get('UIScene').openInventory();
+                    break;
+            }
+        });
+    }
+
+    handleTouchAction() {
+        if (this.dialogActive) {
+            this.closeDialog();
+        } else {
+            const nearbyNPC = this.findNearbyNPC();
+            if (nearbyNPC) {
+                this.handleNPCInteraction(nearbyNPC);
+            } else {
+                const nearbyEnemy = this.findNearbyEnemy();
+                if (nearbyEnemy) {
+                    this.handleBattleStart(nearbyEnemy);
+                }
+            }
+        }
+    }
+
+    findNearbyNPC() {
+        let closestNPC = null;
+        let minDistance = 100;
+        
+        this.npcs.getChildren().forEach((npc) => {
+            const distance = Phaser.Math.Distance.Between(
+                this.player.x, this.player.y,
+                npc.x, npc.y
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestNPC = npc;
+            }
+        });
+        
+        return closestNPC;
+    }
+
+    findNearbyEnemy() {
+        let closestEnemy = null;
+        let minDistance = 100;
+        
+        this.enemies.getChildren().forEach((enemy) => {
+            const distance = Phaser.Math.Distance.Between(
+                this.player.x, this.player.y,
+                enemy.x, enemy.y
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestEnemy = enemy;
+            }
+        });
+        
+        return closestEnemy;
+    }
+
     update() {
+        if (this.touchControls) {
+            this.handleTouchInput();
+        }
+        
         this.player.update();
         
         if (this.dialogActive && Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('SPACE'))) {
             this.closeDialog();
         }
+    }
+
+    handleTouchInput() {
+        const direction = this.touchControls.getDirection();
+        this.updatePlayerFromDirection(direction);
+    }
+
+    updatePlayerFromDirection(direction) {
+        let velocityX = 0;
+        let velocityY = 0;
+        const speed = 200;
+
+        if (direction.up) velocityY = -speed;
+        if (direction.down) velocityY = speed;
+        if (direction.left) velocityX = -speed;
+        if (direction.right) velocityX = speed;
+
+        if (velocityX !== 0 && velocityY !== 0) {
+            velocityX *= 0.707;
+            velocityY *= 0.707;
+        }
+
+        this.player.setVelocity(velocityX, velocityY);
     }
 }

@@ -38,12 +38,16 @@ export default class MainMenuScene extends Phaser.Scene {
     }
 
     createMenuButton(text, y, callback) {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const padding = isMobile ? { left: 60, right: 60, top: 25, bottom: 25 } : { left: 40, right: 40, top: 15, bottom: 15 };
+        const fontSize = isMobile ? '36px' : '28px';
+        
         const button = this.add.text(512, y, text, {
-            fontSize: '28px',
+            fontSize: fontSize,
             color: '#ffffff',
             fontFamily: 'Microsoft YaHei',
             backgroundColor: '#2d3a5c',
-            padding: { left: 40, right: 40, top: 15, bottom: 15 }
+            padding: padding
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         button.on('pointerover', () => {

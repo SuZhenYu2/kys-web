@@ -59,6 +59,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             return;
         }
         
+        if (!this.scene.touchControls || !this.scene.touchControls.isMobile) {
+            this.handleKeyboardInput();
+        }
+    }
+
+    handleKeyboardInput() {
         let velocityX = 0;
         let velocityY = 0;
         

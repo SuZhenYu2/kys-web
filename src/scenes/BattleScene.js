@@ -25,6 +25,8 @@ export default class BattleScene extends Phaser.Scene {
         this.battleEnded = false;
         this.buffs = [];
         this.selectedSkillIndex = 0;
+        
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
     create() {
@@ -40,6 +42,10 @@ export default class BattleScene extends Phaser.Scene {
         this.createEnemyHPBar();
         
         this.updateSkillButtons();
+        
+        if (this.isMobile) {
+            this.createMobileBattleButtons();
+        }
     }
 
     createBattleBackground() {
@@ -543,6 +549,52 @@ export default class BattleScene extends Phaser.Scene {
             this.scene.resume('Game');
             this.scene.get('Game').inBattle = false;
         });
+    }
+
+    createMobileBattleButtons() {
+        const startX = this.scale.width - 60;
+        const startY = this.scale.height - 100;
+        const spacing = 80;
+        
+        this.attackBtn = this.createMobileButton(startX, startY, '⚔️', '攻击', () => this.playerBasicAttack());
+        this.skillBtn = this.createMobileButton(startX - spacing, startY, '🗡️', '武功', () => this.showSkillPanel());
+        this.itemBtn = this.createMobileButton(startX - spacing * 2, startY, '🎒', '物品', () => this.showItemPanel());
+        this.escapeBtn = this.createMobileButton(startX - spacing * 3, startY, '🏃', '逃跑', () => this.tryEscape());
+    }
+
+    createMobileButton(x, y, icon, text, callback) {
+        const btn = this.add.circle(x, y, 35, 0x333333, 0.8);
+        btn.setStrokeStyle(3, 0x555555);
+        
+        const iconText = this.add.text(x, y, icon, {
+            fontSize: '24px'
+        }).setOrigin(0.5);
+        
+        const label = this.add.text(x, y + 45, text, {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: 'Microsoft YaHei'
+        }).setOrigin(0.5);
+        
+        btn.setInteractive({ useHandCursor: true });
+        
+        btn.on('pointerdown', () => {
+            btn.setFillStyle(0x555555, 0.9);
+            btn.setStrokeStyle(3, 0x777777);
+        });
+        
+        btn.on('pointerup', () => {
+            btn.setFillStyle(0x333333, 0.8);
+            btn.setStrokeStyle(3, 0x555555);
+            callback();
+        });
+        
+        btn.on('pointerout', () => {
+            btn.setFillStyle(0x333333, 0.8);
+            btn.setStrokeStyle(3, 0x555555);
+        });
+        
+        return { btn, iconText, label };
     }
 
     update() {
