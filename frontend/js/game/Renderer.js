@@ -2,8 +2,6 @@ class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.cameraX = 0;
-        this.cameraY = 0;
         this.tileSize = 32;
     }
     
@@ -17,34 +15,29 @@ class Renderer {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
     
-    setCamera(playerX, playerY, mapWidth, mapHeight) {
-        this.cameraX = playerX - (this.canvas.width / this.tileSize) / 2;
-        this.cameraY = playerY - (this.canvas.height / this.tileSize) / 2;
-        
-        this.cameraX = Math.max(0, Math.min(this.cameraX, mapWidth - this.canvas.width / this.tileSize));
-        this.cameraY = Math.max(0, Math.min(this.cameraY, mapHeight - this.canvas.height / this.tileSize));
-    }
-    
-    drawMap(map) {
+    drawMap(map, camera) {
         this.ctx.fillStyle = map.backgroundColor || '#2d4a3e';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        const startTileX = Math.floor(this.cameraX);
-        const startTileY = Math.floor(this.cameraY);
+        const cameraX = camera.x - (this.canvas.width / this.tileSize) / 2;
+        const cameraY = camera.y - (this.canvas.height / this.tileSize) / 2;
+        
+        const startTileX = Math.floor(cameraX);
+        const startTileY = Math.floor(cameraY);
         const endTileX = startTileX + Math.ceil(this.canvas.width / this.tileSize) + 1;
         const endTileY = startTileY + Math.ceil(this.canvas.height / this.tileSize) + 1;
         
         for (let x = startTileX; x < endTileX; x++) {
             for (let y = startTileY; y < endTileY; y++) {
                 const tile = map.getTile(x, y);
-                this.drawTile(x, y, tile);
+                this.drawTile(x, y, tile, cameraX, cameraY);
             }
         }
     }
     
-    drawTile(x, y, tile) {
-        const screenX = (x - this.cameraX) * this.tileSize;
-        const screenY = (y - this.cameraY) * this.tileSize;
+    drawTile(x, y, tile, cameraX, cameraY) {
+        const screenX = (x - cameraX) * this.tileSize;
+        const screenY = (y - cameraY) * this.tileSize;
         
         if (tile && tile.color) {
             this.ctx.fillStyle = tile.color;
@@ -58,13 +51,9 @@ class Renderer {
         this.ctx.strokeRect(screenX, screenY, this.tileSize, this.tileSize);
     }
     
-    drawPlayer(player) {
-        player.draw(this.ctx, this.cameraX, this.cameraY, this.tileSize);
-    }
-    
-    drawOtherPlayers(players) {
-        players.forEach(player => {
-            player.draw(this.ctx, this.cameraX, this.cameraY, this.tileSize);
-        });
+    drawPlayer(player, camera) {
+        const cameraX = camera.x - (this.canvas.width / this.tileSize) / 2;
+        const cameraY = camera.y - (this.canvas.height / this.tileSize) / 2;
+        player.draw(this.ctx, cameraX, cameraY, this.tileSize);
     }
 }

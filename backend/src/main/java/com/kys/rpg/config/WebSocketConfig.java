@@ -1,14 +1,25 @@
 package com.kys.rpg.config;
 
+import com.kys.rpg.websocket.WebSocketSessionHandler;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
-import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.*;
 
 @Configuration
+@EnableWebSocket
 @EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+@RequiredArgsConstructor
+public class WebSocketConfig implements WebSocketConfigurer, WebSocketMessageBrokerConfigurer {
+
+    private final WebSocketSessionHandler sessionHandler;
+
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(sessionHandler, "/ws/game")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {

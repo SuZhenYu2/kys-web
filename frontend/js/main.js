@@ -3,11 +3,10 @@ class GameClient {
         this.canvas = null;
         this.ctx = null;
         this.currentPlayer = null;
-        this.otherPlayers = new Map();
         this.gameMap = new GameMap();
         this.renderer = null;
         this.inputHandler = null;
-        this.gameSocket = null;
+        this.webSocketClient = null;
         this.lastUpdateTime = 0;
         this.positionUpdateInterval = 100;
         this.lastPositionUpdate = 0;
@@ -49,6 +48,7 @@ class GameClient {
                 this.showGameUI();
                 this.createDefaultMap();
                 this.startGameLoop();
+                this.connectWebSocket();
             }
         }
     }
@@ -161,9 +161,16 @@ class GameClient {
                     
                     if (now - this.lastPositionUpdate > this.positionUpdateInterval) {
                         this.lastPositionUpdate = now;
+                        if (this.webSocketClient) {
+                            this.webSocketClient.sendMove(this.currentPlayer.x, this.currentPlayer.y);
+                        }
                     }
                 }
             }
+        }
+        
+        if (this.webSocketClient) {
+            this.webSocketClient.update(deltaTime);
         }
         
         this.render();
@@ -174,24 +181,27 @@ class GameClient {
         if (!this.renderer || !this.currentPlayer) return;
         
         this.renderer.clear();
-        this.renderer.setCamera(
-            this.currentPlayer.x, 
-            this.currentPlayer.y, 
-            this.gameMap.width, 
-            this.gameMap.height
-        );
         
-        this.renderer.drawMap(this.gameMap);
+        const camera = {
+            x: this.currentPlayer.x,
+            y: this.currentPlayer.y
+        };
+        
+        this.renderer.drawMap(this.gameMap, camera);
         
         const player = new Player(
             this.currentPlayer.x, 
             this.currentPlayer.y, 
             this.currentPlayer.nickname
         );
-        this.renderer.drawPlayer(player);
+        this.renderer.drawPlayer(player, camera);
         
-        const otherPlayerList = Array.from(this.otherPlayers.values());
-        this.renderer.drawOtherPlayers(otherPlayerList);
+        if (this.webSocketClient) {
+            const otherPlayers = this.webSocketClient.getOtherPlayers();
+            otherPlayers.forEach(otherPlayer => {
+                otherPlayer.render(this.renderer.ctx, camera);
+            });
+        }
         
         this.updatePlayerInfoUI();
     }
@@ -233,6 +243,16 @@ class GameClient {
         document.getElementById('login-panel').classList.remove('hidden');
     }
     
+    connectWebSocket() {
+        try {
+            const wsUrl = 'http://localhost:8080/ws/game';
+            this.webSocketClient = new WebSocketClient(wsUrl, this);
+            this.webSocketClient.connect();
+        } catch (e) {
+            console.log('WebSocket connection disabled for testing');
+        }
+    }
+    
     async handleLogin() {
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
@@ -267,6 +287,7 @@ class GameClient {
         this.showGameUI();
         this.createDefaultMap();
         this.startGameLoop();
+        this.connectWebSocket();
     }
     
     async handleRegister() {
@@ -306,8 +327,12 @@ class GameClient {
         localStorage.removeItem('username');
         localStorage.removeItem('nickname');
         
+        if (this.webSocketClient) {
+            this.webSocketClient.disconnect();
+            this.webSocketClient = null;
+        }
+        
         this.currentPlayer = null;
-        this.otherPlayers.clear();
         
         if (this.gameLoop) {
             cancelAnimationFrame(this.gameLoop);
@@ -334,6 +359,9 @@ class GameClient {
         const message = input.value.trim();
         if (message) {
             this.addChatMessage('你', message);
+            if (this.webSocketClient) {
+                this.webSocketClient.sendChat(message);
+            }
             input.value = '';
         }
     }
