@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>武侠江湖</title>
     <style>
         * {
@@ -10,197 +12,450 @@
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
-        body {
-            background: #1a1a2e;
+
+        html, body {
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            font-family: 'Microsoft YaHei', sans-serif;
+            position: fixed;
             touch-action: none;
         }
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
         }
-        
-        /* 触屏控件样式 */
-        #touch-controls {
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* ============================================
+           探索模式控件
+           ============================================ */
+        #explore-controls {
             position: fixed;
-            bottom: 0;
+            top: 0;
             left: 0;
             right: 0;
-            height: 200px;
+            bottom: 0;
+            z-index: 10;
             pointer-events: none;
-            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 20px;
         }
-        
-        /* 方向键区域 */
-        .dpad-container {
-            position: absolute;
-            left: 20px;
-            bottom: 30px;
-            width: 150px;
-            height: 150px;
+
+        /* 虚拟摇杆区域 */
+        .joystick-area {
+            width: 140px;
+            height: 140px;
+            position: relative;
             pointer-events: auto;
         }
-        
-        .dpad-btn {
+
+        .joystick-base {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2));
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
             position: absolute;
+            top: 10px;
+            left: 10px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .joystick-stick {
             width: 50px;
             height: 50px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 3px solid #4a5a8c;
-            border-radius: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 28px;
-            color: white;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-        }
-        
-        .dpad-btn:active {
-            background: #4a5a8c;
-            border-color: #6a7aac;
-        }
-        
-        .dpad-up {
-            left: 50px;
-            top: 0;
-        }
-        .dpad-down {
-            left: 50px;
-            top: 100px;
-        }
-        .dpad-left {
-            left: 0;
-            top: 50px;
-        }
-        .dpad-right {
-            left: 100px;
-            top: 50px;
-        }
-        
-        /* 动作按钮区域 */
-        .action-buttons {
-            position: absolute;
-            right: 20px;
-            bottom: 30px;
-            display: flex;
-            gap: 15px;
-            pointer-events: auto;
-        }
-        
-        .action-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(45, 58, 92, 0.85);
-            border: 3px solid #4a5a8c;
             border-radius: 50%;
+            background: linear-gradient(145deg, #4a90d9, #357abd);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 4px 15px rgba(74, 144, 217, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease-out;
+        }
+
+        .joystick-stick.active {
+            transform: translate(-50%, -50%) scale(0.95);
+            box-shadow: 
+                0 2px 10px rgba(74, 144, 217, 0.6),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 右侧动作按钮区域 */
+        .action-area {
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.9), rgba(22, 33, 62, 0.9));
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            font-size: 28px;
-            color: white;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
+            justify-content: center;
+            box-shadow: 
+                0 8px 25px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.15s ease-out;
+            cursor: pointer;
         }
-        
+
         .action-btn:active {
-            background: #4a5a8c;
-            border-color: #6a7aac;
+            transform: scale(0.92);
+            background: linear-gradient(145deg, rgba(45, 58, 92, 0.95), rgba(35, 48, 82, 0.95));
+            box-shadow: 
+                0 4px 15px rgba(0, 0, 0, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
         }
-        
+
+        .action-btn.primary {
+            background: linear-gradient(145deg, rgba(74, 144, 217, 0.95), rgba(53, 122, 173, 0.95));
+            border: 2px solid rgba(106, 176, 255, 0.4);
+            box-shadow: 
+                0 8px 25px rgba(74, 144, 217, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        .action-btn.primary:active {
+            background: linear-gradient(145deg, rgba(53, 122, 173, 1), rgba(42, 100, 145, 1));
+            box-shadow: 
+                0 4px 15px rgba(74, 144, 217, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn-icon {
+            font-size: 28px;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
         .action-btn-label {
-            font-size: 12px;
-            margin-top: 2px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            letter-spacing: 0.3px;
         }
-        
-        /* 战斗场景按钮 */
+
+        /* ============================================
+           战斗模式控件
+           ============================================ */
         #battle-controls {
             position: fixed;
-            bottom: 0;
+            top: 0;
             left: 0;
             right: 0;
-            height: 200px;
+            bottom: 0;
+            z-index: 10;
             pointer-events: none;
-            z-index: 1000;
             display: none;
+            padding: 20px;
         }
-        
+
         #battle-controls.active {
             display: block;
         }
-        
-        .battle-buttons {
+
+        .battle-actions {
             position: absolute;
-            right: 20px;
-            bottom: 30px;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 15px;
             pointer-events: auto;
+        }
+
+        .battle-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.95), rgba(22, 33, 62, 0.95));
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 8px 30px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.15s ease-out;
+            cursor: pointer;
+        }
+
+        .battle-btn:active {
+            transform: scale(0.92);
+            background: linear-gradient(145deg, rgba(45, 58, 92, 0.98), rgba(35, 48, 82, 0.98));
+            box-shadow: 
+                0 4px 15px rgba(0, 0, 0, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .battle-btn.attack {
+            background: linear-gradient(145deg, rgba(217, 74, 74, 0.95), rgba(173, 53, 53, 0.95));
+            border: 2px solid rgba(255, 106, 106, 0.4);
+            box-shadow: 
+                0 8px 25px rgba(217, 74, 74, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        .battle-btn.attack:active {
+            background: linear-gradient(145deg, rgba(173, 53, 53, 1), rgba(145, 42, 42, 1));
+        }
+
+        .battle-btn.skill {
+            background: linear-gradient(145deg, rgba(217, 179, 74, 0.95), rgba(173, 142, 53, 0.95));
+            border: 2px solid rgba(255, 210, 106, 0.4);
+            box-shadow: 
+                0 8px 25px rgba(217, 179, 74, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        .battle-btn.skill:active {
+            background: linear-gradient(145deg, rgba(173, 142, 53, 1), rgba(145, 118, 42, 1));
+        }
+
+        .battle-btn-icon {
+            font-size: 32px;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .battle-btn-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* ============================================
+           顶部状态栏
+           ============================================ */
+        #top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 20;
+            padding: 15px 20px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
+            pointer-events: none;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .player-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffd700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .player-level {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .hp-bar-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .bar-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .hp-bar {
+            width: 120px;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #66BB6A);
+            border-radius: 4px;
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .mp-bar {
+            width: 120px;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2196F3, #42A5F5);
+            border-radius: 4px;
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+        }
+
+        .bar-text {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            text-align: right;
+        }
+
+        /* ============================================
+           动画效果
+           ============================================ */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
         }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
-    
-    <!-- 探索场景触屏控件 -->
-    <div id="touch-controls">
-        <!-- 方向键 -->
-        <div class="dpad-container">
-            <div class="dpad-btn dpad-up" id="btn-up">↑</div>
-            <div class="dpad-btn dpad-down" id="btn-down">↓</div>
-            <div class="dpad-btn dpad-left" id="btn-left">←</div>
-            <div class="dpad-btn dpad-right" id="btn-right">→</div>
-        </div>
-        
-        <!-- 动作按钮 -->
-        <div class="action-buttons">
-            <div class="action-btn" id="btn-interact">
-                ⚔️
-                <div class="action-btn-label">互动</div>
+
+    <!-- 顶部状态栏 -->
+    <div id="top-bar">
+        <div class="status-bar">
+            <div class="player-info">
+                <div class="player-name">侠客</div>
+                <div class="player-level">等级 1</div>
             </div>
-            <div class="action-btn" id="btn-menu">
-                📋
-                <div class="action-btn-label">菜单</div>
+            <div class="hp-bar-container">
+                <div class="bar-label">HP</div>
+                <div class="hp-bar">
+                    <div class="hp-fill" id="hp-fill" style="width: 100%"></div>
+                </div>
+                <div class="bar-text" id="hp-text">100/100</div>
             </div>
-            <div class="action-btn" id="btn-inventory">
-                🎒
-                <div class="action-btn-label">背包</div>
+            <div class="hp-bar-container">
+                <div class="bar-label">MP</div>
+                <div class="mp-bar">
+                    <div class="mp-fill" id="mp-fill" style="width: 100%"></div>
+                </div>
+                <div class="bar-text" id="mp-text">50/50</div>
             </div>
         </div>
     </div>
-    
-    <!-- 战斗场景触屏控件 -->
+
+    <!-- 探索模式控件 -->
+    <div id="explore-controls">
+        <div class="joystick-area" id="joystick-area">
+            <div class="joystick-base"></div>
+            <div class="joystick-stick" id="joystick-stick"></div>
+        </div>
+
+        <div class="action-area">
+            <div class="action-row">
+                <div class="action-btn" id="btn-inventory">
+                    <span class="action-btn-icon">🎒</span>
+                    <span class="action-btn-label">背包</span>
+                </div>
+                <div class="action-btn primary" id="btn-interact">
+                    <span class="action-btn-icon">⚔️</span>
+                    <span class="action-btn-label">互动</span>
+                </div>
+            </div>
+            <div class="action-row">
+                <div class="action-btn" id="btn-menu">
+                    <span class="action-btn-icon">☰</span>
+                    <span class="action-btn-label">菜单</span>
+                </div>
+                <div class="action-btn" id="btn-skill">
+                    <span class="action-btn-icon">📚</span>
+                    <span class="action-btn-label">武功</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 战斗模式控件 -->
     <div id="battle-controls">
-        <div class="battle-buttons">
-            <div class="action-btn" id="btn-battle-attack">
-                ⚔️
-                <div class="action-btn-label">攻击</div>
+        <div class="battle-actions">
+            <div class="battle-btn" id="btn-battle-escape">
+                <span class="battle-btn-icon">🏃</span>
+                <span class="battle-btn-label">逃跑</span>
             </div>
-            <div class="action-btn" id="btn-battle-skill">
-                🗡️
-                <div class="action-btn-label">武功</div>
+            <div class="battle-btn" id="btn-battle-item">
+                <span class="battle-btn-icon">🎒</span>
+                <span class="battle-btn-label">物品</span>
             </div>
-            <div class="action-btn" id="btn-battle-item">
-                🎒
-                <div class="action-btn-label">物品</div>
+            <div class="battle-btn skill" id="btn-battle-skill">
+                <span class="battle-btn-icon">🗡️</span>
+                <span class="battle-btn-label">武功</span>
             </div>
-            <div class="action-btn" id="btn-battle-escape">
-                🏃
-                <div class="action-btn-label">逃跑</div>
+            <div class="battle-btn attack" id="btn-battle-attack">
+                <span class="battle-btn-icon">⚔️</span>
+                <span class="battle-btn-label">攻击</span>
             </div>
         </div>
     </div>
-    
+
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>

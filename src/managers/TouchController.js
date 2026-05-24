@@ -1,105 +1,125 @@
 export class TouchController {
     constructor() {
-        this.activeButtons = new Set();
-        this.initControls();
-    }
-
-    initControls() {
-        const buttons = [
-            { id: 'btn-up', direction: 'up' },
-            { id: 'btn-down', direction: 'down' },
-            { id: 'btn-left', direction: 'left' },
-            { id: 'btn-right', direction: 'right' }
-        ];
-
-        buttons.forEach(({ id, direction }) => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                this.addButtonEvents(btn, direction);
-            }
-        });
-
-        const actionButtons = [
-            { id: 'btn-interact', action: 'space' },
-            { id: 'btn-menu', action: 'esc' },
-            { id: 'btn-inventory', action: 'inventory' }
-        ];
-
-        actionButtons.forEach(({ id, action }) => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                this.addActionButtonEvents(btn, action);
-            }
-        });
-
-        // 战斗按钮
-        const battleButtons = [
-            { id: 'btn-battle-attack', action: 'battle-attack' },
-            { id: 'btn-battle-skill', action: 'battle-skill' },
-            { id: 'btn-battle-item', action: 'battle-item' },
-            { id: 'btn-battle-escape', action: 'battle-escape' }
-        ];
-
-        battleButtons.forEach(({ id, action }) => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                this.addActionButtonEvents(btn, action);
-            }
-        });
-    }
-
-    // 切换战斗按钮显示
-    setBattleMode(active) {
-        const touchControls = document.getElementById('touch-controls');
-        const battleControls = document.getElementById('battle-controls');
+        this.joystickActive = false;
+        this.joystickStartX = 0;
+        this.joystickStartY = 0;
+        this.direction = { up: false, down: false, left: false, right: false };
         
-        if (touchControls) {
-            touchControls.style.display = active ? 'none' : 'block';
-        }
+        this.init();
+    }
+
+    init() {
+        this.setupJoystick();
+        this.setupActionButtons();
+    }
+
+    setupJoystick() {
+        const joystickArea = document.getElementById('joystick-area');
+        const joystickStick = document.getElementById('joystick-stick');
         
-        if (battleControls) {
-            battleControls.classList.toggle('active', active);
+        if (!joystickArea || !joystickStick) return;
+
+        const startHandler = (e) => {
+            e.preventDefault();
+            this.joystickActive = true;
+            joystickStick.classList.add('active');
+            
+            const touch = e.touches ? e.touches[0] : e;
+            const rect = joystickArea.getBoundingClientRect();
+            this.joystickStartX = rect.left + rect.width / 2;
+            this.joystickStartY = rect.top + rect.height / 2;
+            
+            this.handleJoystickMove(touch.clientX, touch.clientY);
+        };
+
+        const moveHandler = (e) => {
+            if (!this.joystickActive) return;
+            e.preventDefault();
+            
+            const touch = e.touches ? e.touches[0] : e;
+            this.handleJoystickMove(touch.clientX, touch.clientY);
+        };
+
+        const endHandler = (e) => {
+            if (!this.joystickActive) return;
+            e.preventDefault();
+            
+            this.joystickActive = false;
+            joystickStick.classList.remove('active');
+            this.resetJoystick();
+        };
+
+        joystickArea.addEventListener('mousedown', startHandler);
+        joystickArea.addEventListener('touchstart', startHandler, { passive: false });
+        
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('touchmove', moveHandler, { passive: false });
+        
+        document.addEventListener('mouseup', endHandler);
+        document.addEventListener('touchend', endHandler);
+        document.addEventListener('touchcancel', endHandler);
+    }
+
+    handleJoystickMove(x, y) {
+        const joystickStick = document.getElementById('joystick-stick');
+        const joystickArea = document.getElementById('joystick-area');
+        
+        if (!joystickStick || !joystickArea) return;
+
+        const rect = joystickArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = x - centerX;
+        let dy = y - centerY;
+        
+        const maxDistance = 40;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > maxDistance) {
+            const ratio = maxDistance / distance;
+            dx *= ratio;
+            dy *= ratio;
         }
+
+        joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+        const deadzone = 10;
+        this.direction.up = dy < -deadzone;
+        this.direction.down = dy > deadzone;
+        this.direction.left = dx < -deadzone;
+        this.direction.right = dx > deadzone;
     }
 
-    addButtonEvents(btn, direction) {
-        // 鼠标事件
-        btn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            this.activeButtons.add(direction);
-        });
-
-        btn.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            this.activeButtons.delete(direction);
-        });
-
-        btn.addEventListener('mouseleave', (e) => {
-            e.preventDefault();
-            this.activeButtons.delete(direction);
-        });
-
-        // 触屏事件
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.activeButtons.add(direction);
-        }, { passive: false });
-
-        btn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.activeButtons.delete(direction);
-        }, { passive: false });
-
-        btn.addEventListener('touchcancel', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.activeButtons.delete(direction);
-        }, { passive: false });
+    resetJoystick() {
+        const joystickStick = document.getElementById('joystick-stick');
+        if (joystickStick) {
+            joystickStick.style.transform = 'translate(-50%, -50%)';
+        }
+        this.direction = { up: false, down: false, left: false, right: false };
     }
 
-    addActionButtonEvents(btn, action) {
+    setupActionButtons() {
+        const buttons = {
+            'btn-interact': 'interact',
+            'btn-menu': 'menu',
+            'btn-inventory': 'inventory',
+            'btn-skill': 'skill',
+            'btn-battle-attack': 'battle-attack',
+            'btn-battle-skill': 'battle-skill',
+            'btn-battle-item': 'battle-item',
+            'btn-battle-escape': 'battle-escape'
+        };
+
+        Object.entries(buttons).forEach(([id, action]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                this.addButtonEvents(btn, action);
+            }
+        });
+    }
+
+    addButtonEvents(btn, action) {
         const handlePress = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -108,15 +128,14 @@ export class TouchController {
 
         btn.addEventListener('mousedown', handlePress);
         btn.addEventListener('touchstart', handlePress, { passive: false });
+        
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+        });
     }
 
     getDirection() {
-        return {
-            up: this.activeButtons.has('up'),
-            down: this.activeButtons.has('down'),
-            left: this.activeButtons.has('left'),
-            right: this.activeButtons.has('right')
-        };
+        return this.direction;
     }
 
     emitAction(action) {
@@ -124,6 +143,38 @@ export class TouchController {
             detail: { action }
         });
         window.dispatchEvent(event);
+    }
+
+    setBattleMode(active) {
+        const exploreControls = document.getElementById('explore-controls');
+        const battleControls = document.getElementById('battle-controls');
+        
+        if (exploreControls) {
+            exploreControls.style.display = active ? 'none' : 'flex';
+        }
+        
+        if (battleControls) {
+            battleControls.classList.toggle('active', active);
+        }
+    }
+
+    updateStatusBar(playerData) {
+        const hpFill = document.getElementById('hp-fill');
+        const hpText = document.getElementById('hp-text');
+        const mpFill = document.getElementById('mp-fill');
+        const mpText = document.getElementById('mp-text');
+        
+        if (hpFill && hpText) {
+            const hpPercent = (playerData.hp / playerData.maxHP) * 100;
+            hpFill.style.width = `${hpPercent}%`;
+            hpText.textContent = `${playerData.hp}/${playerData.maxHP}`;
+        }
+        
+        if (mpFill && mpText) {
+            const mpPercent = (playerData.mp / playerData.maxMP) * 100;
+            mpFill.style.width = `${mpPercent}%`;
+            mpText.textContent = `${playerData.mp}/${playerData.maxMP}`;
+        }
     }
 }
 

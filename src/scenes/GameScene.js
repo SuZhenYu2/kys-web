@@ -24,6 +24,18 @@ export default class GameScene extends Phaser.Scene {
         this.createDialogSystem();
         
         this.setupTouchEvents();
+        
+        // 更新顶部状态栏
+        this.updateStatusBar();
+    }
+
+    updateStatusBar() {
+        touchController.updateStatusBar({
+            hp: this.gameManager.player.hp,
+            maxHP: this.gameManager.player.maxHP,
+            mp: this.gameManager.player.mp,
+            maxMP: this.gameManager.player.maxMP
+        });
     }
 
     createMap() {
@@ -216,7 +228,7 @@ export default class GameScene extends Phaser.Scene {
 
     handleTouchAction(action) {
         switch(action) {
-            case 'space':
+            case 'interact':
                 if (this.dialogActive) {
                     this.closeDialog();
                 } else {
@@ -231,11 +243,14 @@ export default class GameScene extends Phaser.Scene {
                     }
                 }
                 break;
-            case 'esc':
+            case 'menu':
                 this.scene.get('UIScene').toggleMenu();
                 break;
             case 'inventory':
                 this.scene.get('UIScene').openInventory();
+                break;
+            case 'skill':
+                this.scene.get('UIScene').scene.launch('Skill');
                 break;
         }
     }
@@ -288,9 +303,6 @@ export default class GameScene extends Phaser.Scene {
         // 处理触屏输入
         this.handleTouchInput();
         
-        // 玩家更新
-        this.player.update();
-        
         // 键盘关闭对话框
         if (this.dialogActive && Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('SPACE'))) {
             this.closeDialog();
@@ -299,7 +311,14 @@ export default class GameScene extends Phaser.Scene {
 
     handleTouchInput() {
         const direction = touchController.getDirection();
-        this.updatePlayerFromDirection(direction);
+        const hasTouchInput = direction.up || direction.down || direction.left || direction.right;
+        
+        if (hasTouchInput) {
+            this.updatePlayerFromDirection(direction);
+        } else {
+            // 如果没有触摸输入，则让Player使用键盘输入
+            this.player.update();
+        }
     }
 
     updatePlayerFromDirection(direction) {

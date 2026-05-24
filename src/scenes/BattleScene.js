@@ -42,6 +42,14 @@ export default class BattleScene extends Phaser.Scene {
         
         this.updateSkillButtons();
         
+        // 更新顶部状态栏
+        touchController.updateStatusBar({
+            hp: this.playerHP,
+            maxHP: this.playerMaxHP,
+            mp: this.playerMP,
+            maxMP: this.playerMaxMP
+        });
+        
         // 启用战斗按钮
         touchController.setBattleMode(true);
         
@@ -505,6 +513,14 @@ export default class BattleScene extends Phaser.Scene {
         const hpPercent = this.playerHP / this.playerMaxHP;
         this.playerHPBar.width = 200 * hpPercent;
         this.playerHPText.text = `${this.playerHP}/${this.playerMaxHP}`;
+        
+        // 更新顶部状态栏
+        touchController.updateStatusBar({
+            hp: this.playerHP,
+            maxHP: this.playerMaxHP,
+            mp: this.playerMP,
+            maxMP: this.playerMaxMP
+        });
     }
 
     updateEnemyHP() {
