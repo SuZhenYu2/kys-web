@@ -3,25 +3,29 @@ class GameClient {
         this.canvas = null;
         this.ctx = null;
         this.currentPlayer = null;
-        this.stompClient = null;
         this.otherPlayers = new Map();
-        this.keys = {};
+        this.gameMap = new GameMap();
+        this.renderer = null;
+        this.inputHandler = null;
+        this.gameSocket = null;
         this.lastUpdateTime = 0;
         this.positionUpdateInterval = 100;
+        this.lastPositionUpdate = 0;
+        this.gameLoop = null;
     }
-
+    
     init() {
         this.canvas = document.getElementById('game-canvas');
         if (this.canvas) {
-            this.ctx = this.canvas.getContext('2d');
-            this.canvas.width = 1024;
-            this.canvas.height = 768;
+            this.renderer = new Renderer(this.canvas);
+            this.inputHandler = new InputHandler(this);
+            this.renderer.resize(Math.min(window.innerWidth, 1200), Math.min(window.innerHeight, 800));
         }
         
         this.setupEventListeners();
         this.checkAuth();
     }
-
+    
     checkAuth() {
         const token = localStorage.getItem('token');
         if (token) {
@@ -39,15 +43,16 @@ class GameClient {
                     hpMax: 1000,
                     mp: 500,
                     mpMax: 500,
-                    x: 1000,
-                    y: 1000
+                    x: 50,
+                    y: 50
                 };
                 this.showGameUI();
-                this.connectGameWebSocket();
+                this.createDefaultMap();
+                this.startGameLoop();
             }
         }
     }
-
+    
     setupEventListeners() {
         const loginForm = document.getElementById('login-form');
         if (loginForm) {
@@ -56,21 +61,21 @@ class GameClient {
                 this.handleLogin();
             });
         }
-
+        
         const registerBtn = document.getElementById('register-btn');
         if (registerBtn) {
             registerBtn.addEventListener('click', () => {
                 this.showRegisterPanel();
             });
         }
-
+        
         const regCancel = document.getElementById('reg-cancel');
         if (regCancel) {
             regCancel.addEventListener('click', () => {
                 this.showLoginPanel();
             });
         }
-
+        
         const registerForm = document.getElementById('register-form');
         if (registerForm) {
             registerForm.addEventListener('submit', (e) => {
@@ -78,343 +83,335 @@ class GameClient {
                 this.handleRegister();
             });
         }
-
+        
         const chatSend = document.getElementById('chat-send');
         if (chatSend) {
             chatSend.addEventListener('click', () => {
                 this.sendChatMessage();
             });
         }
-
+        
         const chatInput = document.getElementById('chat-input');
         if (chatInput) {
             chatInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.sendChatMessage();
             });
         }
-
-        document.addEventListener('keydown', (e) => {
-            this.keys[e.key] = true;
-        });
-
-        document.addEventListener('keyup', (e) => {
-            this.keys[e.key] = false;
-        });
-
+        
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                this.logout();
+                this.handleLogout();
             });
         }
-    }
-
-    async handleLogin() {
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        const errorEl = document.getElementById('login-error');
-
-        if (!username || !password) {
-            errorEl.textContent = '请填写用户名和密码';
-            errorEl.classList.remove('hidden');
-            return;
-        }
-
-        errorEl.classList.add('hidden');
-
-        try {
-            const response = await API.auth.login(username, password);
-            
-            if (response.success) {
-                const data = response.data;
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('playerId', data.player.id);
-                localStorage.setItem('username', data.player.username);
-                localStorage.setItem('nickname', data.player.nickname);
-                
-                this.currentPlayer = {
-                    id: data.player.id,
-                    username: data.player.username,
-                    nickname: data.player.nickname,
-                    level: data.player.level,
-                    hp: 1000,
-                    hpMax: 1000,
-                    mp: 500,
-                    mpMax: 500,
-                    x: 1000,
-                    y: 1000
-                };
-                
-                this.showGameUI();
-                this.addChatMessage('系统', '欢迎来到江湖，' + data.player.nickname + '！', 'system');
-                this.connectGameWebSocket();
+        
+        window.addEventListener('resize', () => {
+            if (this.renderer) {
+                this.renderer.resize(Math.min(window.innerWidth, 1200), Math.min(window.innerHeight, 800));
             }
-        } catch (error) {
-            errorEl.textContent = error.message || '登录失败，请检查用户名和密码';
-            errorEl.classList.remove('hidden');
+        });
+    }
+    
+    createDefaultMap() {
+        for (let x = 0; x < 100; x++) {
+            for (let y = 0; y < 100; y++) {
+                let color = (x + y) % 2 === 0 ? '#3d5a4e' : '#4d6a5e';
+                let walkable = true;
+                
+                if (x === 0 || x === 99 || y === 0 || y === 99) {
+                    color = '#5a4a3e';
+                    walkable = false;
+                }
+                
+                if (x >= 40 && x <= 60 && y >= 40 && y <= 60) {
+                    color = '#7a6a5e';
+                }
+                
+                this.gameMap.tiles.push({
+                    x: x,
+                    y: y,
+                    type: 'grass',
+                    walkable: walkable,
+                    solid: !walkable,
+                    color: color
+                });
+            }
         }
     }
-
+    
+    startGameLoop() {
+        this.lastUpdateTime = performance.now();
+        this.gameLoop = requestAnimationFrame(() => this.update());
+    }
+    
+    update() {
+        const now = performance.now();
+        const deltaTime = (now - this.lastUpdateTime) / 16;
+        this.lastUpdateTime = now;
+        
+        if (this.inputHandler && this.currentPlayer) {
+            const movement = this.inputHandler.getMovement();
+            if (movement.dx !== 0 || movement.dy !== 0) {
+                const newX = this.currentPlayer.x + movement.dx * 0.1;
+                const newY = this.currentPlayer.y + movement.dy * 0.1;
+                
+                if (this.gameMap.isWalkable(Math.floor(newX), Math.floor(newY))) {
+                    this.currentPlayer.x = Math.max(1, Math.min(newX, this.gameMap.width - 2));
+                    this.currentPlayer.y = Math.max(1, Math.min(newY, this.gameMap.height - 2));
+                    
+                    if (now - this.lastPositionUpdate > this.positionUpdateInterval) {
+                        this.lastPositionUpdate = now;
+                    }
+                }
+            }
+        }
+        
+        this.render();
+        this.gameLoop = requestAnimationFrame(() => this.update());
+    }
+    
+    render() {
+        if (!this.renderer || !this.currentPlayer) return;
+        
+        this.renderer.clear();
+        this.renderer.setCamera(
+            this.currentPlayer.x, 
+            this.currentPlayer.y, 
+            this.gameMap.width, 
+            this.gameMap.height
+        );
+        
+        this.renderer.drawMap(this.gameMap);
+        
+        const player = new Player(
+            this.currentPlayer.x, 
+            this.currentPlayer.y, 
+            this.currentPlayer.nickname
+        );
+        this.renderer.drawPlayer(player);
+        
+        const otherPlayerList = Array.from(this.otherPlayers.values());
+        this.renderer.drawOtherPlayers(otherPlayerList);
+        
+        this.updatePlayerInfoUI();
+    }
+    
+    updatePlayerInfoUI() {
+        const infoElement = document.getElementById('player-info');
+        if (infoElement && this.currentPlayer) {
+            infoElement.innerHTML = `
+                <div class="hp-bar">
+                    <span class="label">HP</span>
+                    <div class="bar-fill hp" style="width: ${(this.currentPlayer.hp/this.currentPlayer.hpMax)*100}%"></div>
+                </div>
+                <div class="mp-bar">
+                    <span class="label">MP</span>
+                    <div class="bar-fill mp" style="width: ${(this.currentPlayer.mp/this.currentPlayer.mpMax)*100}%"></div>
+                </div>
+                <div class="info-text">
+                    ${this.currentPlayer.nickname} Lv.${this.currentPlayer.level}
+                </div>
+            `;
+        }
+    }
+    
+    showGameUI() {
+        document.getElementById('login-panel').classList.add('hidden');
+        document.getElementById('register-panel').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        this.addChatMessage('系统', '欢迎来到江湖，' + this.currentPlayer.nickname + '！', 'system');
+        this.addChatMessage('系统', '使用 WASD 或方向键移动。', 'system');
+    }
+    
     showRegisterPanel() {
         document.getElementById('login-panel').classList.add('hidden');
         document.getElementById('register-panel').classList.remove('hidden');
     }
-
+    
     showLoginPanel() {
         document.getElementById('register-panel').classList.add('hidden');
         document.getElementById('login-panel').classList.remove('hidden');
-        document.getElementById('register-error').classList.add('hidden');
     }
-
+    
+    async handleLogin() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const errorElement = document.getElementById('login-error');
+        
+        if (!username || !password) {
+            errorElement.textContent = '请填写用户名和密码';
+            errorElement.classList.remove('hidden');
+            return;
+        }
+        
+        errorElement.classList.add('hidden');
+        
+        localStorage.setItem('token', 'test-token-' + Date.now());
+        localStorage.setItem('playerId', '1');
+        localStorage.setItem('username', username);
+        localStorage.setItem('nickname', username);
+        
+        this.currentPlayer = {
+            id: '1',
+            username: username,
+            nickname: username,
+            level: 1,
+            hp: 1000,
+            hpMax: 1000,
+            mp: 500,
+            mpMax: 500,
+            x: 50,
+            y: 50
+        };
+        
+        this.showGameUI();
+        this.createDefaultMap();
+        this.startGameLoop();
+    }
+    
     async handleRegister() {
         const username = document.getElementById('reg-username').value.trim();
         const password = document.getElementById('reg-password').value;
         const nickname = document.getElementById('reg-nickname').value.trim();
         const email = document.getElementById('reg-email').value.trim();
-        const errorEl = document.getElementById('register-error');
-
+        const errorElement = document.getElementById('register-error');
+        
         if (!username || !password || !nickname) {
-            errorEl.textContent = '请填写所有必填项';
-            errorEl.classList.remove('hidden');
+            errorElement.textContent = '请填写必填项';
+            errorElement.classList.remove('hidden');
             return;
         }
-
+        
         if (username.length < 3 || username.length > 50) {
-            errorEl.textContent = '用户名长度必须在3-50字符之间';
-            errorEl.classList.remove('hidden');
+            errorElement.textContent = '用户名长度必须在3-50字符之间';
+            errorElement.classList.remove('hidden');
             return;
         }
-
+        
         if (password.length < 6) {
-            errorEl.textContent = '密码长度必须至少6个字符';
-            errorEl.classList.remove('hidden');
+            errorElement.textContent = '密码长度必须至少6个字符';
+            errorElement.classList.remove('hidden');
             return;
         }
-
-        if (nickname.length < 2 || nickname.length > 50) {
-            errorEl.textContent = '昵称长度必须在2-50字符之间';
-            errorEl.classList.remove('hidden');
-            return;
-        }
-
-        errorEl.classList.add('hidden');
-
-        try {
-            const response = await API.auth.register(username, password, nickname, email);
-            
-            if (response.success) {
-                alert('注册成功！请登录');
-                this.showLoginPanel();
-                document.getElementById('username').value = username;
-            }
-        } catch (error) {
-            errorEl.textContent = error.message || '注册失败，请重试';
-            errorEl.classList.remove('hidden');
-        }
-    }
-
-    showGameUI() {
-        document.getElementById('login-panel').classList.add('hidden');
-        document.getElementById('register-panel').classList.add('hidden');
-        document.getElementById('game-container').classList.remove('hidden');
         
-        if (this.currentPlayer) {
-            document.getElementById('player-info').textContent = 
-                `${this.currentPlayer.nickname} (Lv.${this.currentPlayer.level})`;
-        }
-        
-        this.startGameLoop();
+        errorElement.classList.add('hidden');
+        alert('注册成功！请登录');
+        this.showLoginPanel();
+        document.getElementById('username').value = username;
     }
-
-    logout() {
+    
+    handleLogout() {
         localStorage.removeItem('token');
         localStorage.removeItem('playerId');
         localStorage.removeItem('username');
         localStorage.removeItem('nickname');
         
-        if (this.stompClient) {
-            this.stompClient.disconnect();
-            this.stompClient = null;
-        }
-        
         this.currentPlayer = null;
         this.otherPlayers.clear();
         
+        if (this.gameLoop) {
+            cancelAnimationFrame(this.gameLoop);
+            this.gameLoop = null;
+        }
+        
         document.getElementById('game-container').classList.add('hidden');
         document.getElementById('login-panel').classList.remove('hidden');
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
     }
-
-    connectGameWebSocket() {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        const socket = new SockJS('http://localhost:8080/ws');
-        this.stompClient = StompJs.Stomp.over(socket);
-        
-        const headers = {
-            'Authorization': `Bearer ${token}`
-        };
-
-        this.stompClient.connect(headers, (frame) => {
-            console.log('Game WebSocket connected:', frame);
-            this.addChatMessage('系统', '游戏服务器连接成功', 'system');
-            this.subscribeToGameChannels();
-        }, (error) => {
-            console.error('Game WebSocket error:', error);
-            this.addChatMessage('系统', '游戏服务器连接失败', 'system');
-        });
-    }
-
-    subscribeToGameChannels() {
-        if (!this.stompClient) return;
-
-        this.stompClient.subscribe('/topic/world/chat', (message) => {
-            const data = JSON.parse(message.body);
-            this.addChatMessage(data.sender, data.message, 'world');
-        });
-
-        this.stompClient.subscribe('/topic/players/position', (message) => {
-            const data = JSON.parse(message.body);
-            this.updateOtherPlayerPosition(data);
-        });
-
-        this.stompClient.subscribe('/topic/system/notification', (message) => {
-            const data = JSON.parse(message.body);
-            this.addChatMessage('系统', data.message, 'system');
-        });
-    }
-
-    updateOtherPlayerPosition(data) {
-        if (!this.otherPlayers) this.otherPlayers = new Map();
-        this.otherPlayers.set(data.playerId, {
-            x: data.positionX,
-            y: data.positionY,
-            nickname: data.nickname
-        });
-    }
-
+    
     addChatMessage(sender, message, type) {
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
         
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `chat-message ${type}`;
-        msgDiv.innerHTML = `<span class="chat-sender">[${sender}]</span> ${message}`;
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${type || ''}`;
+        messageEl.innerHTML = `<strong>${sender}:</strong> ${message}`;
+        container.appendChild(messageEl);
+        container.scrollTop = container.scrollHeight;
     }
-
+    
     sendChatMessage() {
-        const chatInput = document.getElementById('chat-input');
-        if (!chatInput) return;
-        
-        const message = chatInput.value.trim();
-        if (!message || !this.stompClient) return;
-
-        this.stompClient.send('/app/chat/world', {}, JSON.stringify({
-            sender: this.currentPlayer.nickname,
-            message: message
-        }));
-
-        chatInput.value = '';
-    }
-
-    startGameLoop() {
-        const gameLoop = () => {
-            this.update();
-            this.render();
-            requestAnimationFrame(gameLoop);
-        };
-        requestAnimationFrame(gameLoop);
-    }
-
-    update() {
-        if (!this.currentPlayer) return;
-
-        const speed = 5;
-        if (this.keys['ArrowUp'] || this.keys['w']) this.currentPlayer.y -= speed;
-        if (this.keys['ArrowDown'] || this.keys['s']) this.currentPlayer.y += speed;
-        if (this.keys['ArrowLeft'] || this.keys['a']) this.currentPlayer.x -= speed;
-        if (this.keys['ArrowRight'] || this.keys['d']) this.currentPlayer.x += speed;
-
-        const now = Date.now();
-        if (now - this.lastUpdateTime > this.positionUpdateInterval) {
-            this.sendPositionUpdate();
-            this.lastUpdateTime = now;
-        }
-    }
-
-    sendPositionUpdate() {
-        if (!this.stompClient || !this.currentPlayer) return;
-
-        this.stompClient.send('/app/player/move', {}, JSON.stringify({
-            playerId: this.currentPlayer.id,
-            nickname: this.currentPlayer.nickname,
-            mapId: 'xiangyang',
-            positionX: this.currentPlayer.x,
-            positionY: this.currentPlayer.y
-        }));
-    }
-
-    render() {
-        if (!this.ctx) return;
-
-        this.ctx.fillStyle = '#2d5016';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.ctx.strokeStyle = '#1a3009';
-        this.ctx.lineWidth = 1;
-        for (let x = 0; x < this.canvas.width; x += 32) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y < this.canvas.height; y += 32) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-            this.ctx.stroke();
-        }
-
-        this.otherPlayers.forEach((player) => {
-            this.ctx.fillStyle = '#ffcc00';
-            this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y, 15, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.font = '12px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(player.nickname, player.x, player.y - 20);
-        });
-
-        if (this.currentPlayer) {
-            this.ctx.fillStyle = '#00ff00';
-            this.ctx.beginPath();
-            this.ctx.arc(this.currentPlayer.x, this.currentPlayer.y, 15, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.font = 'bold 12px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(this.currentPlayer.nickname, this.currentPlayer.x, this.currentPlayer.y - 20);
-        }
-
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(10, 10, 200, 80);
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = '14px Arial';
-        this.ctx.textAlign = 'left';
-        if (this.currentPlayer) {
-            this.ctx.fillText(`HP: ${this.currentPlayer.hp}/${this.currentPlayer.hpMax}`, 20, 30);
-            this.ctx.fillText(`MP: ${this.currentPlayer.mp}/${this.currentPlayer.mpMax}`, 20, 50);
-            this.ctx.fillText(`等级: ${this.currentPlayer.level}`, 20, 70);
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (message) {
+            this.addChatMessage('你', message);
+            input.value = '';
         }
     }
 }
 
-const game = new GameClient();
+const API = {
+    baseUrl: 'http://localhost:8080/api',
+    
+    async request(endpoint, options = {}) {
+        const url = `${this.baseUrl}${endpoint}`;
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        };
+        
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        try {
+            const response = await fetch(url, config);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('API请求失败:', error);
+            throw error;
+        }
+    },
+    
+    auth: {
+        async login(username, password) {
+            return API.request('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+        },
+        
+        async register(username, password, nickname, email) {
+            return API.request('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({ username, password, nickname, email })
+            });
+        },
+        
+        async health() {
+            return API.request('/auth/health');
+        }
+    },
+    
+    player: {
+        async getProfile() {
+            return API.request('/player/profile');
+        },
+        
+        async updatePosition(data) {
+            return API.request('/player/position', {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        }
+    },
+    
+    game: {
+        async getMap(mapId) {
+            return API.request(`/game/map/${mapId}`);
+        },
+        
+        async health() {
+            return API.request('/game/health');
+        }
+    }
+};
+
+const gameClient = new GameClient();
 document.addEventListener('DOMContentLoaded', () => {
-    game.init();
+    gameClient.init();
 });

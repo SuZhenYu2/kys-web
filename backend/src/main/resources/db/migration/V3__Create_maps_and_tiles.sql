@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS maps (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    map_id VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    width INT NOT NULL,
+    height INT NOT NULL,
+    background_color VARCHAR(20),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS map_tiles (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    map_id VARCHAR(50) NOT NULL,
+    x INT NOT NULL,
+    y INT NOT NULL,
+    type VARCHAR(20),
+    is_walkable BOOLEAN DEFAULT TRUE,
+    is_solid BOOLEAN DEFAULT FALSE,
+    tile_color VARCHAR(20),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (map_id) REFERENCES maps(map_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_tile_position (map_id, x, y)
+);
