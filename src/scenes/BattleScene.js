@@ -26,7 +26,8 @@ export default class BattleScene extends Phaser.Scene {
         this.buffs = [];
         this.selectedSkillIndex = 0;
         
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // 始终显示触屏按钮，方便测试
+        this.showMobileControls = true;
     }
 
     create() {
@@ -43,7 +44,7 @@ export default class BattleScene extends Phaser.Scene {
         
         this.updateSkillButtons();
         
-        if (this.isMobile) {
+        if (this.showMobileControls) {
             this.createMobileBattleButtons();
         }
     }
@@ -552,9 +553,9 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     createMobileBattleButtons() {
-        const startX = this.scale.width - 60;
-        const startY = this.scale.height - 100;
-        const spacing = 80;
+        const startX = this.scale.width - 70;
+        const startY = this.scale.height - 120;
+        const spacing = 90;
         
         this.attackBtn = this.createMobileButton(startX, startY, '⚔️', '攻击', () => this.playerBasicAttack());
         this.skillBtn = this.createMobileButton(startX - spacing, startY, '🗡️', '武功', () => this.showSkillPanel());
@@ -563,35 +564,48 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     createMobileButton(x, y, icon, text, callback) {
-        const btn = this.add.circle(x, y, 35, 0x333333, 0.8);
-        btn.setStrokeStyle(3, 0x555555);
+        const btn = this.add.circle(x, y, 40, 0x2d3a5c, 0.85);
+        btn.setStrokeStyle(3, 0x4a5a8c);
+        btn.setDepth(100);
         
         const iconText = this.add.text(x, y, icon, {
-            fontSize: '24px'
-        }).setOrigin(0.5);
+            fontSize: '28px'
+        }).setOrigin(0.5).setDepth(101);
         
-        const label = this.add.text(x, y + 45, text, {
-            fontSize: '14px',
+        const label = this.add.text(x, y + 50, text, {
+            fontSize: '16px',
             color: '#ffffff',
             fontFamily: 'Microsoft YaHei'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
         
         btn.setInteractive({ useHandCursor: true });
         
         btn.on('pointerdown', () => {
-            btn.setFillStyle(0x555555, 0.9);
-            btn.setStrokeStyle(3, 0x777777);
+            btn.setFillStyle(0x4a5a8c, 0.95);
+            btn.setStrokeStyle(3, 0x6a7aac);
         });
         
         btn.on('pointerup', () => {
-            btn.setFillStyle(0x333333, 0.8);
-            btn.setStrokeStyle(3, 0x555555);
+            btn.setFillStyle(0x2d3a5c, 0.85);
+            btn.setStrokeStyle(3, 0x4a5a8c);
             callback();
         });
         
         btn.on('pointerout', () => {
-            btn.setFillStyle(0x333333, 0.8);
-            btn.setStrokeStyle(3, 0x555555);
+            btn.setFillStyle(0x2d3a5c, 0.85);
+            btn.setStrokeStyle(3, 0x4a5a8c);
+        });
+        
+        // 触屏事件
+        btn.on('touchstart', () => {
+            btn.setFillStyle(0x4a5a8c, 0.95);
+            btn.setStrokeStyle(3, 0x6a7aac);
+        });
+        
+        btn.on('touchend', () => {
+            btn.setFillStyle(0x2d3a5c, 0.85);
+            btn.setStrokeStyle(3, 0x4a5a8c);
+            callback();
         });
         
         return { btn, iconText, label };

@@ -59,9 +59,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             return;
         }
         
-        if (!this.scene.touchControls || !this.scene.touchControls.isMobile) {
+        // 检查是否使用触屏控制
+        const hasTouchControls = this.scene.touchControls && this.scene.touchControls.showControls;
+        
+        if (!hasTouchControls) {
             this.handleKeyboardInput();
         }
+        // 如果使用触屏控制，则由 GameScene 的 handleTouchInput 处理
     }
 
     handleKeyboardInput() {
