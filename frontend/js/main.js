@@ -245,7 +245,9 @@ class GameClient {
     
     connectWebSocket() {
         try {
-            const wsUrl = 'http://localhost:8080/ws/game';
+            const isSecure = window.location.protocol === 'https:';
+            const protocol = isSecure ? 'https:' : 'http:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/game`;
             this.webSocketClient = new WebSocketClient(wsUrl, this);
             this.webSocketClient.connect();
         } catch (e) {

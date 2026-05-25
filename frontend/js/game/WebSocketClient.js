@@ -12,7 +12,14 @@ class WebSocketClient {
 
     connect() {
         try {
-            this.socket = new SockJS(this.url);
+            const isSecure = window.location.protocol === 'https:';
+            let wsUrl = this.url;
+            
+            if (isSecure && wsUrl.startsWith('http:')) {
+                wsUrl = wsUrl.replace('http:', 'https:');
+            }
+            
+            this.socket = new SockJS(wsUrl);
 
             this.socket.onopen = () => {
                 console.log('WebSocket connected');
@@ -40,9 +47,11 @@ class WebSocketClient {
 
             this.socket.onerror = (error) => {
                 console.error('WebSocket error:', error);
+                this.connected = false;
             };
         } catch (err) {
             console.error('Error connecting to WebSocket:', err);
+            this.connected = false;
         }
     }
 
